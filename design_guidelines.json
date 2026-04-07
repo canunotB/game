@@ -1,0 +1,111 @@
+{
+  "theme": "dark",
+  "archetype": "5 (Jewel & Luxury - adapted for Cinematic Mythical RPG)",
+  "design_philosophy": "A 2.5D immersive RPG blending a 3D environment with 2D pixel art. The UI must feel cinematic, dangerous, and deeply atmospheric, drawing from The Odyssey. The interface acts as a glass overlay on a living, breathing, rainy world.",
+  "colors": {
+    "background": {
+      "base": "#07090F",
+      "surface": "#12151C",
+      "glass": "rgba(7, 9, 15, 0.75)"
+    },
+    "text": {
+      "primary": "#F8FAFC",
+      "secondary": "#94A3B8",
+      "accent": "#C5A059"
+    },
+    "brand": {
+      "primary": "#C5A059",
+      "danger": "#D92D20",
+      "earth": "#4A3C31",
+      "rain": "#3B82F6"
+    },
+    "borders": {
+      "subtle": "rgba(255, 255, 255, 0.1)",
+      "active": "rgba(197, 160, 89, 0.5)"
+    }
+  },
+  "typography": {
+    "fonts": {
+      "headings": "Cormorant Garamond",
+      "body": "IBM Plex Mono",
+      "dialogue": "Cormorant Garamond",
+      "ui": "JetBrains Mono"
+    },
+    "scales": {
+      "h1": "text-5xl sm:text-6xl tracking-tighter leading-none font-medium",
+      "h2": "text-3xl sm:text-4xl tracking-tight",
+      "h3": "text-xl sm:text-2xl tracking-wide uppercase",
+      "dialogue": "text-2xl md:text-3xl leading-relaxed",
+      "body": "text-base leading-relaxed",
+      "small": "text-xs tracking-[0.2em] uppercase"
+    }
+  },
+  "layout_and_spacing": {
+    "philosophy": "Cinematic and asymmetric. The game canvas is the hero. Avoid center-everything disease. Elements anchor to the edges to frame the action.",
+    "spacing_scale": ["p-2", "p-4", "p-8", "p-12", "p-16"],
+    "components": {
+      "dialogue_box": "fixed bottom-12 left-12 w-[calc(100%-6rem)] md:w-[60%] max-w-3xl p-8 backdrop-blur-xl bg-black/80 border-l-4 border-[#C5A059] shadow-[0_8px_32px_rgba(0,0,0,0.8)]",
+      "hud": "absolute top-12 left-12 flex flex-col gap-6 z-50",
+      "boss_bar": "absolute top-12 right-12 w-[60%] max-w-xl z-50 flex flex-col items-end",
+      "qte_prompt": "absolute top-[40%] left-[60%] -translate-x-1/2 -translate-y-1/2 z-50",
+      "menus": "grid grid-cols-1 md:grid-cols-12 gap-12 p-16"
+    }
+  },
+  "components": {
+    "buttons": {
+      "primary": "bg-transparent border border-[#C5A059] text-[#C5A059] px-8 py-4 uppercase tracking-[0.2em] text-sm hover:bg-[#C5A059] hover:text-black transition-all duration-300 shadow-none hover:shadow-[0_0_20px_rgba(197,160,89,0.3)]",
+      "qte_action": "w-20 h-20 rounded-none bg-black/80 border-2 border-[#D92D20] text-[#D92D20] text-3xl flex items-center justify-center backdrop-blur-lg animate-pulse shadow-[4px_4px_0px_rgba(217,45,32,0.5)]"
+    },
+    "health_bar": {
+      "player": "flex gap-3 items-center",
+      "boss": "h-1 w-full bg-white/10 relative overflow-hidden mt-2",
+      "boss_fill": "absolute top-0 right-0 h-full bg-[#D92D20] transition-all duration-300"
+    },
+    "environmental_prompt": "px-4 py-2 bg-[#12151C]/90 border border-white/10 text-white text-xs tracking-[0.2em] uppercase rounded-none backdrop-blur-md shadow-[4px_4px_0px_rgba(0,0,0,0.5)]"
+  },
+  "motion_and_interactions": {
+    "hover_states": "Text elements brighten to #FFFFFF, borders glow with brand primary shadow.",
+    "dialogue_entrance": "Fade in and slide right (transform: translateX(-20px) to 0, opacity 0 to 1).",
+    "qte_timing": "Shrinking geometric frame around the button using framer-motion to indicate time limit.",
+    "combat_hit": "Brief screen shake (framer-motion x/y translation) and red flash overlay (opacity spike)."
+  },
+  "game_mechanics_ui": {
+    "rendering_implementation": "Use @react-three/fiber. Render the world (ravine, trees, mud) using 3D meshes. Render characters (player, Kairen, NPCs) as Billboard `<sprite>` or `<mesh>` with `<planeGeometry>` always facing the camera.",
+    "weather": "Implement particle system for rain using @react-three/drei `<Sparkles>` or custom shaders. Darken scene lighting, add fog.",
+    "environmental_combat": "When player is near an interactive object (rock/tree), show environmental_prompt. On key press, trigger QTE sequence for dodge/attack."
+  },
+  "libraries_and_tools": {
+    "3d": "three, @react-three/fiber, @react-three/drei",
+    "animations": "framer-motion",
+    "icons": "lucide-react (minimal usage, mostly text-driven UI)",
+    "styling": "tailwindcss, class-variance-authority, clsx, tailwind-merge"
+  },
+  "testing": {
+    "requirements": "All actionable buttons, dialog choices, and QTE inputs must have `data-testid` attributes (e.g., `data-testid=\"qte-dodge-button\"`, `data-testid=\"dialogue-next-button\"`)."
+  },
+  "image_urls": [
+    {
+      "category": "hero_sprite",
+      "description": "2D pixel art sprite of an 8-year-old boy in rustic tunic. (Note: Image generation tools hit rate limits. Main agent to use local CSS art, colored meshes, or basic geometries as temporary stand-ins without using banned placeholder URLs).",
+      "url": ""
+    },
+    {
+      "category": "boss_sprite",
+      "description": "2D pixel art of Kairen, human warrior with sword.",
+      "url": ""
+    },
+    {
+      "category": "environment_texture",
+      "description": "Muddy ravine, rain, ancient greek ruins background texture.",
+      "url": ""
+    }
+  ],
+  "instructions_to_main_agent": [
+    "Build a 2.5D game using React Three Fiber. The UI overlay must sit on top of the `<Canvas>` using absolute positioning.",
+    "Use standard React UI state to manage dialogue, health, and QTE triggers over the 3D scene.",
+    "Implement character sprites as billboarding planes in the 3D scene. Ensure they face the camera.",
+    "Follow the jewel & luxury dark theme—everything must feel cinematic, moody, and dangerous. Avoid flat bright colors except for critical warnings (like the boss health bar or QTE prompts).",
+    "Ensure asymmetry in layout: place dialogues bottom-left, boss health top-right. Do not center-align everything.",
+    "Since external image APIs failed, DO NOT use services like via.placeholder.com. Use Three.js primitives (like colored cubes/spheres) to represent characters and trees until real assets are implemented, or generate local CSS shapes."
+  ]
+}
