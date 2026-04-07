@@ -63,9 +63,21 @@ export const BATTLE_ARENA = {
 };
 
 export const KAIREN_ATTACKS = {
-  heavy_slash: { name: 'Heavy Slash', damage: 18, range: 3, telegraph: 1.0, recovery: 1.2, qteLength: 3 },
-  thrust: { name: 'Piercing Thrust', damage: 12, range: 3.5, telegraph: 0.6, recovery: 0.7, qteLength: 2 },
-  shield_bash: { name: 'Shield Bash', damage: 10, range: 2, telegraph: 0.4, recovery: 0.8, qteLength: 2, knockback: 3 },
+  // PARRY attacks (1 QTE arrow, tight timing — fail = Kairen empowered)
+  quick_slash: { type: 'parry', name: 'Quick Slash', damage: 8, range: 3, telegraph: 0.4, recovery: 0.5, qteLength: 1 },
+  shield_bash: { type: 'parry', name: 'Shield Bash', damage: 6, range: 2.5, telegraph: 0.5, recovery: 0.6, qteLength: 1, knockback: 2 },
+  // DODGE attacks (2-3 QTE arrows — fail = full damage)
+  heavy_slash: { type: 'dodge', name: 'Heavy Slash', damage: 14, range: 4, telegraph: 0.7, recovery: 0.9, qteLength: 3 },
+  thrust: { type: 'dodge', name: 'Thrust', damage: 11, range: 5, telegraph: 0.6, recovery: 0.8, qteLength: 2 },
+  // BARRAGE attacks (8-12 arrows, doesn't end on miss — damage per missed arrow)
+  barrage: { type: 'barrage', name: 'Barrage', damage: 24, range: 4, telegraph: 1.0, recovery: 1.5, qteLength: 10, phase: 2 },
+  enraged_combo: { type: 'barrage', name: 'Fury', damage: 30, range: 5, telegraph: 1.2, recovery: 2.0, qteLength: 12, phase: 3 },
+};
+
+export const KAIREN_PHASES = {
+  1: { hpThreshold: 100, speedMult: 1.0, swingRate: 0.35, attacks: ['quick_slash', 'shield_bash', 'heavy_slash', 'thrust'] },
+  2: { hpThreshold: 50, speedMult: 1.2, swingRate: 0.45, attacks: ['quick_slash', 'shield_bash', 'heavy_slash', 'thrust', 'barrage'] },
+  3: { hpThreshold: 30, speedMult: 1.4, swingRate: 0.55, attacks: ['quick_slash', 'shield_bash', 'heavy_slash', 'thrust', 'barrage', 'enraged_combo'] },
 };
 
 export const STORY_LINES = [
