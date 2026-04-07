@@ -221,44 +221,36 @@ export function drawIsoPlayer(ctx, wx, wy, dir, frame, camX, camY, isAttacking, 
 
   if (isInvisible) ctx.restore();
 
-  // Attack slash (combo-aware)
+  // Attack slash — subtle thin lines
   if (isAttacking && attackAngle !== undefined) {
     ctx.save();
-    ctx.globalAlpha = 0.8;
     const combo = comboCount || 1;
     if (combo === 1) {
-      // Quick horizontal slash
+      ctx.globalAlpha = 0.5;
       ctx.strokeStyle = '#C5A059';
-      ctx.lineWidth = 3;
-      ctx.shadowColor = '#C5A059'; ctx.shadowBlur = 10;
+      ctx.lineWidth = 1.5;
       ctx.beginPath();
-      ctx.arc(sx, sy - 10 - jh, 28, attackAngle - 0.6, attackAngle + 0.6);
+      ctx.arc(sx, sy - 10 - jh, 22, attackAngle - 0.4, attackAngle + 0.4);
       ctx.stroke();
     } else if (combo === 2) {
-      // Upward diagonal
-      ctx.strokeStyle = '#e0a030';
-      ctx.lineWidth = 4;
-      ctx.shadowColor = '#e0a030'; ctx.shadowBlur = 14;
-      ctx.beginPath();
-      ctx.arc(sx, sy - 14 - jh, 32, attackAngle - 0.8, attackAngle + 0.8);
-      ctx.stroke();
-      ctx.strokeStyle = '#fff';
+      ctx.globalAlpha = 0.55;
+      ctx.strokeStyle = '#d4b060';
       ctx.lineWidth = 2;
       ctx.beginPath();
-      ctx.arc(sx, sy - 14 - jh, 30, attackAngle - 0.5, attackAngle + 0.5);
+      ctx.arc(sx, sy - 12 - jh, 26, attackAngle - 0.5, attackAngle + 0.5);
       ctx.stroke();
     } else {
-      // Spinning slash (full arc)
-      ctx.strokeStyle = '#ffd700';
-      ctx.lineWidth = 5;
-      ctx.shadowColor = '#ffd700'; ctx.shadowBlur = 18;
-      ctx.beginPath();
-      ctx.arc(sx, sy - 12 - jh, 36, attackAngle - 1.2, attackAngle + 1.2);
-      ctx.stroke();
-      ctx.strokeStyle = '#fff';
+      ctx.globalAlpha = 0.6;
+      ctx.strokeStyle = '#e0c070';
       ctx.lineWidth = 2;
       ctx.beginPath();
-      ctx.arc(sx, sy - 12 - jh, 33, attackAngle - 0.9, attackAngle + 0.9);
+      ctx.arc(sx, sy - 12 - jh, 28, attackAngle - 0.7, attackAngle + 0.7);
+      ctx.stroke();
+      ctx.strokeStyle = '#ffffff';
+      ctx.lineWidth = 1;
+      ctx.globalAlpha = 0.25;
+      ctx.beginPath();
+      ctx.arc(sx, sy - 12 - jh, 26, attackAngle - 0.4, attackAngle + 0.4);
       ctx.stroke();
     }
     ctx.restore();
@@ -574,37 +566,111 @@ export function drawInteractIndicator(ctx, wx, wy, camX, camY, text) {
   ctx.fillText(text, sx, sy - 44 + bounce);
 }
 
-// ═══ KAIREN ATTACK EFFECT (big slash) ═══
+// ═══ KAIREN ATTACK — Massive blue-white crystalline energy ═══
 export function drawKairenAttack(ctx, kx, ky, attackType, progress, camX, camY) {
   const { x: sx, y: sy } = toScreen(kx, ky, camX, camY);
   ctx.save();
-  ctx.globalAlpha = 0.6 * (1 - progress);
+  const fade = Math.max(0, 1 - progress * 0.8);
+
+  // Screen-wide glow under all attacks
+  ctx.globalAlpha = 0.08 * fade;
+  ctx.fillStyle = '#4080ff';
+  ctx.fillRect(sx - 300, sy - 300, 600, 600);
 
   if (attackType === 'heavy_slash') {
-    ctx.strokeStyle = '#D92D20';
+    // ── Massive crystalline energy arc ──
+    const r = 55 + progress * 50;
+    // Outer deep blue edge
+    ctx.globalAlpha = 0.7 * fade;
+    ctx.strokeStyle = '#2050c0';
+    ctx.lineWidth = 10;
+    ctx.shadowColor = '#3060ff'; ctx.shadowBlur = 35;
+    ctx.beginPath(); ctx.arc(sx, sy - 10, r, -Math.PI * 0.95, Math.PI * 0.5); ctx.stroke();
+    // Mid cyan layer
+    ctx.strokeStyle = '#70b0ff';
     ctx.lineWidth = 6;
-    ctx.shadowColor = '#D92D20'; ctx.shadowBlur = 20;
-    ctx.beginPath();
-    ctx.arc(sx, sy - 10, 60, -Math.PI * 0.8, Math.PI * 0.3);
-    ctx.stroke();
-    ctx.strokeStyle = '#ff6040';
+    ctx.shadowColor = '#80c0ff'; ctx.shadowBlur = 22;
+    ctx.beginPath(); ctx.arc(sx, sy - 10, r - 6, -Math.PI * 0.9, Math.PI * 0.45); ctx.stroke();
+    // Core white
+    ctx.strokeStyle = '#ffffff';
     ctx.lineWidth = 3;
-    ctx.beginPath();
-    ctx.arc(sx, sy - 10, 56, -Math.PI * 0.7, Math.PI * 0.2);
-    ctx.stroke();
+    ctx.shadowColor = '#ffffff'; ctx.shadowBlur = 14;
+    ctx.beginPath(); ctx.arc(sx, sy - 10, r - 11, -Math.PI * 0.85, Math.PI * 0.4); ctx.stroke();
+    // Crystalline shards radiating outward
+    ctx.shadowBlur = 0;
+    for (let i = 0; i < 16; i++) {
+      const a = -Math.PI * 0.95 + (i / 16) * Math.PI * 1.45 + progress * 0.4;
+      const pr = r + 5 + progress * 35 + Math.random() * 12;
+      const px = sx + Math.cos(a) * pr;
+      const py = sy - 10 + Math.sin(a) * pr;
+      const sz = 2 + Math.random() * 6;
+      ctx.globalAlpha = (0.6 + Math.random() * 0.4) * fade;
+      ctx.fillStyle = i % 4 === 0 ? '#ffffff' : i % 4 === 1 ? '#a0d8ff' : i % 4 === 2 ? '#5090ff' : '#2060c0';
+      ctx.fillRect(px - sz / 2, py - sz / 2, sz, sz);
+    }
+    // Ground impact burst
+    ctx.globalAlpha = 0.2 * fade;
+    ctx.fillStyle = '#4080ff';
+    ctx.beginPath(); ctx.ellipse(sx, sy + 4, 50 + progress * 25, 20 + progress * 10, 0, 0, Math.PI * 2); ctx.fill();
+
   } else if (attackType === 'thrust') {
-    ctx.strokeStyle = '#D92D20';
-    ctx.lineWidth = 4;
-    ctx.shadowColor = '#D92D20'; ctx.shadowBlur = 15;
-    ctx.beginPath();
-    ctx.moveTo(sx, sy - 10);
-    ctx.lineTo(sx + 70, sy - 10);
-    ctx.stroke();
+    // ── Energy lance / beam ──
+    const len = 50 + progress * 80;
+    // Outer glow
+    ctx.globalAlpha = 0.5 * fade;
+    ctx.strokeStyle = '#2050c0';
+    ctx.lineWidth = 14;
+    ctx.shadowColor = '#3060ff'; ctx.shadowBlur = 30;
+    ctx.beginPath(); ctx.moveTo(sx, sy - 10); ctx.lineTo(sx + len, sy - 10); ctx.stroke();
+    // Mid beam
+    ctx.strokeStyle = '#70b0ff';
+    ctx.lineWidth = 8;
+    ctx.shadowColor = '#80c0ff'; ctx.shadowBlur = 18;
+    ctx.beginPath(); ctx.moveTo(sx + 5, sy - 10); ctx.lineTo(sx + len - 2, sy - 10); ctx.stroke();
+    // Core white
+    ctx.strokeStyle = '#ffffff';
+    ctx.lineWidth = 3;
+    ctx.shadowColor = '#ffffff'; ctx.shadowBlur = 10;
+    ctx.beginPath(); ctx.moveTo(sx + 10, sy - 10); ctx.lineTo(sx + len - 5, sy - 10); ctx.stroke();
+    // Tip shatter particles
+    ctx.shadowBlur = 0;
+    for (let i = 0; i < 10; i++) {
+      const ox = len + Math.random() * 20 * progress;
+      const oy = (Math.random() - 0.5) * 30 * progress;
+      const sz = 2 + Math.random() * 4;
+      ctx.globalAlpha = (0.5 + Math.random() * 0.5) * fade;
+      ctx.fillStyle = i % 3 === 0 ? '#ffffff' : i % 3 === 1 ? '#a0d8ff' : '#4080ff';
+      ctx.fillRect(sx + ox - sz / 2, sy - 10 + oy - sz / 2, sz, sz);
+    }
+
   } else if (attackType === 'shield_bash') {
-    ctx.fillStyle = 'rgba(217,45,32,0.3)';
-    ctx.beginPath();
-    ctx.arc(sx - 20, sy, 35, 0, Math.PI * 2);
-    ctx.fill();
+    // ── Expanding shockwave ring ──
+    const r = 20 + progress * 60;
+    // Outer ring
+    ctx.globalAlpha = 0.6 * fade;
+    ctx.strokeStyle = '#2050c0';
+    ctx.lineWidth = 8;
+    ctx.shadowColor = '#4080ff'; ctx.shadowBlur = 25;
+    ctx.beginPath(); ctx.arc(sx - 10, sy, r, 0, Math.PI * 2); ctx.stroke();
+    // Mid ring
+    ctx.strokeStyle = '#80c0ff';
+    ctx.lineWidth = 4;
+    ctx.beginPath(); ctx.arc(sx - 10, sy, r - 5, 0, Math.PI * 2); ctx.stroke();
+    // Inner white flash
+    ctx.globalAlpha = 0.4 * fade * (1 - progress);
+    ctx.fillStyle = '#ffffff';
+    ctx.beginPath(); ctx.arc(sx - 10, sy, r * 0.4, 0, Math.PI * 2); ctx.fill();
+    // Flying fragments
+    ctx.shadowBlur = 0;
+    for (let i = 0; i < 8; i++) {
+      const a = (i / 8) * Math.PI * 2;
+      const px = sx - 10 + Math.cos(a) * (r + 10);
+      const py = sy + Math.sin(a) * (r + 10) * 0.6;
+      const sz = 2 + Math.random() * 3;
+      ctx.globalAlpha = 0.7 * fade;
+      ctx.fillStyle = i % 2 === 0 ? '#ffffff' : '#70b0ff';
+      ctx.fillRect(px - sz / 2, py - sz / 2, sz, sz);
+    }
   }
   ctx.restore();
 }

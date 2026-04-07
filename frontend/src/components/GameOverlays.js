@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import {
   QTE_ARROWS, QTE_KEYS, DIALOGUE_TONES, getReputationTitle,
   ALL_SKILLS, ALL_EQUIPMENT, DEFAULT_KEYBINDS, KEYBIND_LABELS,
+  SKILL_UNLOCK_CONDITIONS, SKILL_UNLOCK_ORDER,
 } from '../lib/gameData';
 
 // ─── Player HUD ──────────────────────────────────────────
@@ -143,23 +144,43 @@ export function QTEOverlay({ sequence, onComplete }) {
   );
 }
 
-// ─── Skill Bar (bottom-center during battle) ─────────────
-export function SkillBar({ equippedSkills, cooldowns, mana, keybinds }) {
+// ─── Skill Bar (shows locked/unlocked) ───────────────────
+export function SkillBar({ equippedSkills, unlockedSkills, cooldowns, mana, keybinds }) {
+  // Show equipped skills + next locked skills to fill 5 slots
+  const slots = [];
+  for (let i = 0; i < 5; i++) {
+    if (i < equippedSkills.length) {
+      const sid = equippedSkills[i];
+      const skill = ALL_SKILLS.find(s => s.id === sid);
+      if (skill) { slots.push({ skill, unlocked: true, slotIdx: i }); continue; }
+    }
+    // Fill remaining with next locked skills
+    const nextLocked = SKILL_UNLOCK_ORDER.find(sid =>
+      !unlockedSkills.includes(sid) && !slots.some(s => s.skill?.id === sid)
+    );
+    if (nextLocked) {
+      const skill = ALL_SKILLS.find(s => s.id === nextLocked);
+      if (skill) { slots.push({ skill, unlocked: false, slotIdx: i }); continue; }
+    }
+    slots.push({ skill: null, unlocked: false, slotIdx: i });
+  }
+
   return (
     <div className="skill-bar" data-testid="skill-bar">
-      {equippedSkills.map((skillId, i) => {
-        const skill = ALL_SKILLS.find(s => s.id === skillId);
-        if (!skill) return <div key={i} className="skill-slot empty" data-testid={`skill-slot-${i}`} />;
-        const cd = cooldowns[skillId] || 0;
-        const canUse = cd <= 0 && mana >= skill.manaCost;
+      {slots.map(({ skill, unlocked, slotIdx }) => {
+        if (!skill) return <div key={slotIdx} className="skill-slot empty" data-testid={`skill-slot-${slotIdx}`} />;
+        const cd = unlocked ? (cooldowns[skill.id] || 0) : 0;
+        const canUse = unlocked && cd <= 0 && mana >= skill.manaCost;
         const cdPct = cd > 0 ? (cd / skill.cooldown) * 100 : 0;
-        const keyLabel = keybinds[`skill${i + 1}`] || (i + 1).toString();
+        const keyLabel = keybinds[`skill${slotIdx + 1}`] || (slotIdx + 1).toString();
+        const cond = SKILL_UNLOCK_CONDITIONS[skill.id];
         return (
-          <div key={i} className={`skill-slot ${canUse ? 'ready' : 'on-cd'}`} data-testid={`skill-slot-${i}`} title={`${skill.name} - ${skill.desc}`}>
-            <div className="skill-icon" style={{ color: skill.color }}>{skill.icon}</div>
+          <div key={slotIdx} className={`skill-slot ${unlocked ? (canUse ? 'ready' : 'on-cd') : 'locked'}`} data-testid={`skill-slot-${slotIdx}`} title={unlocked ? `${skill.name} - ${skill.desc}` : cond?.desc || 'Locked'}>
+            <div className="skill-icon" style={{ color: unlocked ? skill.color : '#3a3a4a' }}>{skill.icon}</div>
             {cd > 0 && <div className="skill-cd-overlay" style={{ height: `${cdPct}%` }} />}
-            <div className="skill-key">{keyLabel}</div>
-            <div className="skill-name-tag">{skill.name}</div>
+            {!unlocked && <div className="skill-lock-overlay" />}
+            <div className="skill-key">{unlocked ? keyLabel : '?'}</div>
+            <div className="skill-name-tag">{unlocked ? skill.name : cond?.desc || '???'}</div>
           </div>
         );
       })}
@@ -167,17 +188,31 @@ export function SkillBar({ equippedSkills, cooldowns, mana, keybinds }) {
   );
 }
 
+// ─── Skill Unlock Notification ───────────────────────────
+export function SkillUnlockNotification({ skill }) {
+  return (
+    <motion.div
+      className="skill-unlock-notification"
+      initial={{ scale: 0, opacity: 0, y: 30 }}
+      animate={{ scale: 1, opacity: 1, y: 0 }}
+      exit={{ scale: 0.8, opacity: 0, y: -20 }}
+      transition={{ type: 'spring', stiffness: 400, damping: 25 }}
+      data-testid="skill-unlock-notification"
+    >
+      <div className="unlock-flash" />
+      <div className="unlock-label">SKILL AWAKENED</div>
+      <div className="unlock-icon" style={{ color: skill.color }}>{skill.icon}</div>
+      <div className="unlock-name">{skill.name}</div>
+      <div className="unlock-desc">{skill.desc}</div>
+    </motion.div>
+  );
+}
+
 // ─── Recovery Prompt (after QTE) ─────────────────────────
 export function RecoveryPrompt({ direction }) {
   const arrows = { up: '\u2191', down: '\u2193', left: '\u2190', right: '\u2192' };
   return (
-    <motion.div
-      className="recovery-prompt"
-      initial={{ scale: 0.5, opacity: 0 }}
-      animate={{ scale: 1, opacity: 1 }}
-      exit={{ opacity: 0 }}
-      data-testid="recovery-prompt"
-    >
+    <motion.div className="recovery-prompt" initial={{ scale: 0.5, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ opacity: 0 }} data-testid="recovery-prompt">
       <div className="recovery-label">CATCH!</div>
       <div className="recovery-arrow">{arrows[direction]}</div>
     </motion.div>
@@ -185,7 +220,7 @@ export function RecoveryPrompt({ direction }) {
 }
 
 // ─── Game Menu (Tab) ─────────────────────────────────────
-export function GameMenu({ equippedSkills, setEquippedSkills, equipment, setEquipment, keybinds, setKeybinds, onClose }) {
+export function GameMenu({ equippedSkills, setEquippedSkills, unlockedSkills, combatStats, equipment, setEquipment, keybinds, setKeybinds, onClose }) {
   const [tab, setTab] = useState('skills');
   const [rebindAction, setRebindAction] = useState(null);
 
@@ -207,6 +242,7 @@ export function GameMenu({ equippedSkills, setEquippedSkills, equipment, setEqui
   }, [rebindAction, setKeybinds]);
 
   const toggleSkill = (skillId) => {
+    if (!unlockedSkills.includes(skillId)) return;
     setEquippedSkills(prev => {
       if (prev.includes(skillId)) return prev.filter(s => s !== skillId);
       if (prev.length >= 5) return prev;
@@ -236,7 +272,7 @@ export function GameMenu({ equippedSkills, setEquippedSkills, equipment, setEqui
       <div className="game-menu">
         <div className="menu-header">
           <div className="menu-tabs">
-            <button className={`menu-tab ${tab === 'skills' ? 'active' : ''}`} onClick={() => setTab('skills')} data-testid="menu-tab-skills">Skills</button>
+            <button className={`menu-tab ${tab === 'skills' ? 'active' : ''}`} onClick={() => setTab('skills')} data-testid="menu-tab-skills">Skill Tree</button>
             <button className={`menu-tab ${tab === 'equipment' ? 'active' : ''}`} onClick={() => setTab('equipment')} data-testid="menu-tab-equipment">Equipment</button>
             <button className={`menu-tab ${tab === 'keybinds' ? 'active' : ''}`} onClick={() => setTab('keybinds')} data-testid="menu-tab-keybinds">Keybinds</button>
           </div>
@@ -246,29 +282,49 @@ export function GameMenu({ equippedSkills, setEquippedSkills, equipment, setEqui
         <div className="menu-content">
           {tab === 'skills' && (
             <div className="menu-skills" data-testid="menu-skills-panel">
-              <div className="menu-section-title">Equipped ({equippedSkills.length}/5)</div>
+              <div className="menu-section-title">Combat Mastery ({unlockedSkills.length}/{ALL_SKILLS.length} Awakened)</div>
               <div className="skills-grid">
-                {ALL_SKILLS.map(skill => {
-                  const equipped = equippedSkills.includes(skill.id);
+                {SKILL_UNLOCK_ORDER.map(skillId => {
+                  const skill = ALL_SKILLS.find(s => s.id === skillId);
+                  if (!skill) return null;
+                  const isUnlocked = unlockedSkills.includes(skillId);
+                  const equipped = equippedSkills.includes(skillId);
+                  const cond = SKILL_UNLOCK_CONDITIONS[skillId];
+                  const statVal = combatStats[cond?.stat] || 0;
+                  const progress = cond ? Math.min(1, statVal / cond.threshold) : 0;
                   return (
                     <button
-                      key={skill.id}
-                      className={`skill-card ${equipped ? 'equipped' : ''}`}
-                      onClick={() => toggleSkill(skill.id)}
-                      data-testid={`skill-card-${skill.id}`}
+                      key={skillId}
+                      className={`skill-card ${isUnlocked ? (equipped ? 'equipped' : 'unlocked') : 'locked'}`}
+                      onClick={() => toggleSkill(skillId)}
+                      data-testid={`skill-card-${skillId}`}
                     >
-                      <div className="skill-card-icon" style={{ color: skill.color }}>{skill.icon}</div>
+                      <div className="skill-card-icon" style={{ color: isUnlocked ? skill.color : '#2a2a3a' }}>{skill.icon}</div>
                       <div className="skill-card-info">
-                        <div className="skill-card-name">{skill.name}</div>
-                        <div className="skill-card-desc">{skill.desc}</div>
-                        <div className="skill-card-stats">
-                          <span>Mana: {skill.manaCost}</span>
-                          <span>CD: {skill.cooldown}s</span>
-                          {skill.damage > 0 && <span>DMG: {skill.damage}</span>}
-                          {skill.healAmount && <span>Heal: {skill.healAmount}</span>}
-                        </div>
+                        <div className="skill-card-name" style={{ color: isUnlocked ? '#F8FAFC' : '#64748B' }}>{skill.name}</div>
+                        {isUnlocked ? (
+                          <div className="skill-card-desc">{skill.desc}</div>
+                        ) : (
+                          <div className="skill-unlock-progress">
+                            <div className="skill-condition">{cond?.desc}</div>
+                            <div className="progress-bar-mini">
+                              <div className="progress-fill-mini" style={{ width: `${progress * 100}%` }} />
+                            </div>
+                            <div className="progress-text">{statVal} / {cond?.threshold}</div>
+                          </div>
+                        )}
+                        {isUnlocked && (
+                          <div className="skill-card-stats">
+                            <span>Mana: {skill.manaCost}</span>
+                            <span>CD: {skill.cooldown}s</span>
+                            {skill.damage > 0 && <span>DMG: {skill.damage}</span>}
+                            {skill.healAmount && <span>Heal: {skill.healAmount}</span>}
+                          </div>
+                        )}
                       </div>
-                      <div className={`skill-equip-badge ${equipped ? 'on' : ''}`}>{equipped ? 'Equipped' : 'Equip'}</div>
+                      <div className={`skill-equip-badge ${equipped ? 'on' : isUnlocked ? '' : 'locked-badge'}`}>
+                        {equipped ? 'Equipped' : isUnlocked ? 'Equip' : 'Locked'}
+                      </div>
                     </button>
                   );
                 })}
@@ -304,24 +360,13 @@ export function GameMenu({ equippedSkills, setEquippedSkills, equipment, setEqui
               <div className="menu-section-title">Click an action, then press a key to rebind</div>
               <div className="keybinds-list">
                 {Object.entries(KEYBIND_LABELS).map(([action, label]) => (
-                  <button
-                    key={action}
-                    className={`keybind-row ${rebindAction === action ? 'rebinding' : ''}`}
-                    onClick={() => setRebindAction(action)}
-                    data-testid={`keybind-${action}`}
-                  >
+                  <button key={action} className={`keybind-row ${rebindAction === action ? 'rebinding' : ''}`} onClick={() => setRebindAction(action)} data-testid={`keybind-${action}`}>
                     <span className="keybind-action">{label}</span>
                     <span className="keybind-key">{rebindAction === action ? 'Press key...' : keyDisplay(keybinds[action] || DEFAULT_KEYBINDS[action])}</span>
                   </button>
                 ))}
               </div>
-              <button
-                className="keybind-reset-btn"
-                onClick={() => { setKeybinds({ ...DEFAULT_KEYBINDS }); localStorage.removeItem('odyssey_keybinds'); }}
-                data-testid="keybind-reset"
-              >
-                Reset to Defaults
-              </button>
+              <button className="keybind-reset-btn" onClick={() => { setKeybinds({ ...DEFAULT_KEYBINDS }); localStorage.removeItem('odyssey_keybinds'); }} data-testid="keybind-reset">Reset to Defaults</button>
             </div>
           )}
         </div>
@@ -367,7 +412,6 @@ export function ControlsHelp({ mode, keybinds }) {
   );
 }
 
-// ─── Damage Flash ────────────────────────────────────────
 export function DamageFlash() {
   return <div className="damage-flash" data-testid="damage-flash" />;
 }

@@ -137,7 +137,24 @@ export const ALL_SKILLS = [
   { id: 'healing_light', name: 'Heal', icon: 'H', manaCost: 18, cooldown: 10, damage: 0, healAmount: 15, desc: 'Restore vitality', type: 'heal', color: '#4ade80' },
 ];
 
-export const DEFAULT_EQUIPPED_SKILLS = ['flame_dash', 'lightning_strike', 'wind_slash', 'earth_shield', 'healing_light'];
+export const DEFAULT_EQUIPPED_SKILLS = [];
+
+export const SKILL_UNLOCK_CONDITIONS = {
+  flame_dash: { stat: 'dashCount', threshold: 4, desc: 'Dash 4 times' },
+  wind_slash: { stat: 'hitsLanded', threshold: 8, desc: 'Hit Kairen 8 times' },
+  earth_shield: { stat: 'goodBlocks', threshold: 2, desc: 'Block 2 attacks' },
+  lightning_strike: { stat: 'fullCombos', threshold: 2, desc: 'Land 2 full combos' },
+  shadow_step: { stat: 'perfectDodges', threshold: 2, desc: 'Perfect counter 2 attacks' },
+  divine_wrath: { stat: 'perfectDodges', threshold: 5, desc: 'Perfect counter 5 attacks' },
+  healing_light: { stat: 'damageTaken', threshold: 40, desc: 'Survive 40 damage' },
+};
+
+export const SKILL_UNLOCK_ORDER = ['flame_dash', 'wind_slash', 'earth_shield', 'lightning_strike', 'shadow_step', 'divine_wrath', 'healing_light'];
+
+export const DEFAULT_COMBAT_STATS = {
+  dashCount: 0, hitsLanded: 0, fullCombos: 0,
+  perfectDodges: 0, goodBlocks: 0, damageTaken: 0,
+};
 
 // ─── EQUIPMENT ───────────────────────────────────────────
 export const ALL_EQUIPMENT = {

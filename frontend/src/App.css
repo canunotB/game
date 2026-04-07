@@ -102,7 +102,8 @@
 .skill-slot { width: 52px; height: 52px; position: relative; background: rgba(0,0,0,0.75); border: 1px solid rgba(255,255,255,0.1); backdrop-filter: blur(6px); display: flex; align-items: center; justify-content: center; flex-direction: column; transition: border-color 0.15s; }
 .skill-slot.ready { border-color: rgba(197,160,89,0.4); }
 .skill-slot.on-cd { opacity: 0.5; }
-.skill-slot.empty { border-style: dashed; opacity: 0.3; }
+.skill-slot.locked { opacity: 0.35; border-style: dashed; border-color: rgba(255,255,255,0.06); }
+.skill-lock-overlay { position: absolute; inset: 0; background: rgba(7,9,15,0.6); display: flex; align-items: center; justify-content: center; font-size: 0.7rem; color: #64748B; }
 .skill-icon { font-family: 'JetBrains Mono', monospace; font-size: 1.1rem; font-weight: 700; line-height: 1; }
 .skill-cd-overlay { position: absolute; bottom: 0; left: 0; right: 0; background: rgba(0,0,0,0.65); pointer-events: none; }
 .skill-key { position: absolute; top: 2px; right: 3px; font-family: 'JetBrains Mono', monospace; font-size: 0.45rem; color: #C5A059; letter-spacing: 0.05em; }
@@ -143,6 +144,26 @@
 .skill-card-stats { display: flex; gap: 0.6rem; margin-top: 0.25rem; font-family: 'JetBrains Mono', monospace; font-size: 0.45rem; color: #64748B; letter-spacing: 0.05em; text-transform: uppercase; }
 .skill-equip-badge { font-family: 'JetBrains Mono', monospace; font-size: 0.5rem; letter-spacing: 0.1em; text-transform: uppercase; color: #64748B; padding: 0.2rem 0.5rem; border: 1px solid rgba(255,255,255,0.08); flex-shrink: 0; }
 .skill-equip-badge.on { color: #C5A059; border-color: rgba(197,160,89,0.3); }
+.skill-equip-badge.locked-badge { color: #3a3a4a; border-color: rgba(255,255,255,0.04); }
+
+/* Skill unlock progress (in menu) */
+.skill-unlock-progress { margin-top: 0.15rem; }
+.skill-condition { font-family: 'JetBrains Mono', monospace; font-size: 0.45rem; color: #64748B; letter-spacing: 0.05em; }
+.progress-bar-mini { width: 100%; height: 3px; background: rgba(255,255,255,0.05); margin-top: 0.2rem; overflow: hidden; }
+.progress-fill-mini { height: 100%; background: #C5A059; transition: width 0.3s ease; }
+.progress-text { font-family: 'JetBrains Mono', monospace; font-size: 0.4rem; color: #64748B; margin-top: 0.1rem; }
+.skill-card.locked { opacity: 0.55; border-color: rgba(255,255,255,0.03); }
+.skill-card.locked:hover { background: rgba(255,255,255,0.02); border-color: rgba(255,255,255,0.06); }
+.skill-card.unlocked { border-color: rgba(197,160,89,0.15); }
+
+/* ─── Skill Unlock Notification ─────────────────────────── */
+.skill-unlock-notification { position: absolute; top: 25%; left: 50%; transform: translateX(-50%); z-index: 80; display: flex; flex-direction: column; align-items: center; gap: 0.25rem; padding: 1rem 2rem; background: rgba(7,9,15,0.9); border: 1px solid rgba(197,160,89,0.3); backdrop-filter: blur(8px); pointer-events: none; }
+.skill-unlock-notification .unlock-flash { position: absolute; inset: -2px; border: 2px solid rgba(197,160,89,0.5); animation: unlock-flash-anim 0.6s ease-out; pointer-events: none; }
+@keyframes unlock-flash-anim { 0% { opacity: 1; transform: scale(1); } 100% { opacity: 0; transform: scale(1.15); } }
+.unlock-label { font-family: 'JetBrains Mono', monospace; font-size: 0.5rem; letter-spacing: 0.35em; text-transform: uppercase; color: #C5A059; }
+.unlock-icon { font-family: 'JetBrains Mono', monospace; font-size: 2rem; font-weight: 700; }
+.unlock-name { font-family: 'Cormorant Garamond', serif; font-size: 1.3rem; color: #F8FAFC; letter-spacing: 0.05em; }
+.unlock-desc { font-family: 'Cormorant Garamond', serif; font-size: 0.85rem; color: #94A3B8; }
 
 /* Equipment */
 .menu-equipment { display: flex; gap: 0.8rem; flex-wrap: wrap; }

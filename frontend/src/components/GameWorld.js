@@ -6,7 +6,8 @@ import {
   PLAYER_SPEED, KAIREN_SPEED, KAIREN_ATTACKS, MAX_STAMINA, MAX_MANA,
   ATTACK_STAMINA, DASH_STAMINA, STAMINA_REGEN, MANA_REGEN,
   NPC_DIALOGUE_OPTIONS, DIALOGUE_TONES,
-  ALL_SKILLS, DEFAULT_EQUIPPED_SKILLS, ALL_EQUIPMENT, DEFAULT_EQUIPMENT, DEFAULT_KEYBINDS,
+  ALL_SKILLS, ALL_EQUIPMENT, DEFAULT_EQUIPMENT, DEFAULT_KEYBINDS,
+  SKILL_UNLOCK_CONDITIONS, SKILL_UNLOCK_ORDER, DEFAULT_COMBAT_STATS,
 } from '../lib/gameData';
 import {
   toScreen, drawIsoTile, drawIsoTree, drawIsoPlayer, drawIsoKairen, drawIsoNPC,
@@ -17,6 +18,7 @@ import {
 import {
   PlayerHUD, BossBar, DialogueBox, QTEOverlay,
   InventoryDisplay, ControlsHelp, DamageFlash, SkillBar, GameMenu, RecoveryPrompt,
+  SkillUnlockNotification,
 } from './GameOverlays';
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
@@ -46,9 +48,8 @@ export default function GameWorld({ onEnding }) {
   const [cutsceneText, setCutsceneText] = useState(null);
 
   const [menuOpen, setMenuOpen] = useState(false);
-  const [equippedSkills, setEquippedSkills] = useState(() => {
-    try { const s = localStorage.getItem('odyssey_skills'); return s ? JSON.parse(s) : [...DEFAULT_EQUIPPED_SKILLS]; } catch { return [...DEFAULT_EQUIPPED_SKILLS]; }
-  });
+  const [unlockedSkills, setUnlockedSkills] = useState([]);
+  const [equippedSkills, setEquippedSkills] = useState([]);
   const [equipment, setEquipment] = useState(() => {
     try { const s = localStorage.getItem('odyssey_equipment'); return s ? JSON.parse(s) : { ...DEFAULT_EQUIPMENT }; } catch { return { ...DEFAULT_EQUIPMENT }; }
   });
@@ -58,19 +59,19 @@ export default function GameWorld({ onEnding }) {
   const [skillCooldowns, setSkillCooldowns] = useState({});
   const [recoveryState, setRecoveryState] = useState(null);
   const [comboDisplay, setComboDisplay] = useState(0);
+  const [skillNotification, setSkillNotification] = useState(null);
+  const [combatStats, setCombatStats] = useState({ ...DEFAULT_COMBAT_STATS });
 
   useEffect(() => { keybindsRef.current = keybinds; }, [keybinds]);
-  useEffect(() => { localStorage.setItem('odyssey_skills', JSON.stringify(equippedSkills)); }, [equippedSkills]);
   useEffect(() => { localStorage.setItem('odyssey_equipment', JSON.stringify(equipment)); }, [equipment]);
   useEffect(() => { localStorage.setItem('odyssey_keybinds', JSON.stringify(keybinds)); }, [keybinds]);
 
-  // Sync equipped skills to game ref
   useEffect(() => {
-    if (gameRef.current) gameRef.current.player.equippedSkills = equippedSkills;
-  }, [equippedSkills]);
-  useEffect(() => {
-    if (gameRef.current) gameRef.current.player.equipment = equipment;
-  }, [equipment]);
+    if (gameRef.current) {
+      gameRef.current.player.equippedSkills = equippedSkills;
+      gameRef.current.player.equipment = equipment;
+    }
+  }, [equippedSkills, equipment]);
 
   // ─── CANVAS INIT ─────────────────────────────────────────
   useEffect(() => {
@@ -84,12 +85,13 @@ export default function GameWorld({ onEnding }) {
         speed: PLAYER_SPEED, inventory: [], isAttacking: false, attackTimer: 0,
         attackAngle: 0, isDashing: false, dashTimer: 0, invincible: 0,
         stamina: MAX_STAMINA, mana: MAX_MANA, dashTrail: [],
-        comboCount: 0, lastAttackTime: 0, comboTimer: 0,
+        comboCount: 0, lastAttackTime: 0,
         isJumping: false, jumpTimer: 0, jumpHeight: 0, jumpPhase: 'none',
         isInvisible: false, invisibleTimer: 0,
         hasShield: false, staggerTimer: 0,
-        skillCooldowns: {}, equippedSkills: [...DEFAULT_EQUIPPED_SKILLS],
+        skillCooldowns: {}, equippedSkills: [],
         equipment: { ...DEFAULT_EQUIPMENT },
+        pushVx: 0, pushVy: 0, pushTimer: 0,
       },
       camera: { x: 0, y: 0 },
       npcs: VILLAGE_NPCS.map(n => ({ ...n })),
@@ -108,6 +110,9 @@ export default function GameWorld({ onEnding }) {
       rain: { particles: [] },
       cutscene: { active: false, phase: 0, timer: 0, fadeAlpha: 0, fallY: 0, fallScale: 1 },
       recovery: { active: false, direction: null, timer: 0 },
+      combatStats: { ...DEFAULT_COMBAT_STATS },
+      unlockedSkills: [],
+      lastQteSequence: null,
       dialogueActive: false, qteActive: false, frameCount: 0, time: 0, reputation: 0,
       menuOpen: false,
     };
@@ -120,7 +125,7 @@ export default function GameWorld({ onEnding }) {
     return () => { window.removeEventListener('resize', handleResize); cancelAnimationFrame(animFrameRef.current); };
   }, []);
 
-  // ─── KEYBOARD (with blur fix) ────────────────────────────
+  // ─── KEYBOARD (blur clears stuck keys) ───────────────────
   useEffect(() => {
     const normalize = k => k.length === 1 ? k.toLowerCase() : k.toLowerCase();
     const down = e => {
@@ -190,7 +195,6 @@ export default function GameWorld({ onEnding }) {
     }
   }, [dialogue]);
 
-  // Close dialogue
   useEffect(() => {
     const handleKey = e => {
       if (e.key === 'Enter' && dialogue && !dialogue.typing && !dialogueChoices) {
@@ -202,7 +206,40 @@ export default function GameWorld({ onEnding }) {
     return () => window.removeEventListener('keydown', handleKey);
   }, [dialogue, dialogueChoices]);
 
-  // ─── QTE COMPLETE → RECOVERY ─────────────────────────────
+  // ─── SKILL UNLOCK CHECK ──────────────────────────────────
+  const checkSkillUnlocks = useCallback((stats, currentUnlocked) => {
+    const newUnlocks = [];
+    for (const skillId of SKILL_UNLOCK_ORDER) {
+      if (currentUnlocked.includes(skillId)) continue;
+      const cond = SKILL_UNLOCK_CONDITIONS[skillId];
+      if (cond && stats[cond.stat] >= cond.threshold) {
+        newUnlocks.push(skillId);
+      }
+    }
+    return newUnlocks;
+  }, []);
+
+  const triggerSkillUnlock = useCallback((skillId) => {
+    const skill = ALL_SKILLS.find(s => s.id === skillId);
+    if (!skill) return;
+    setSkillNotification({ skill });
+    setTimeout(() => setSkillNotification(null), 2500);
+    setUnlockedSkills(prev => {
+      const next = [...prev, skillId];
+      if (gameRef.current) gameRef.current.unlockedSkills = next;
+      return next;
+    });
+    setEquippedSkills(prev => {
+      if (prev.length < 5) {
+        const next = [...prev, skillId];
+        if (gameRef.current) gameRef.current.player.equippedSkills = next;
+        return next;
+      }
+      return prev;
+    });
+  }, []);
+
+  // ─── QTE COMPLETE → PUSHBACK + RECOVERY ──────────────────
   const handleQTEComplete = useCallback((result) => {
     const game = gameRef.current;
     if (!game) return;
@@ -211,31 +248,54 @@ export default function GameWorld({ onEnding }) {
     const p = game.player;
     const atk = KAIREN_ATTACKS[k.currentAttack] || KAIREN_ATTACKS.heavy_slash;
 
+    // ── FIXED DAMAGE: perfect/good = 0 damage ──
     if (result === 'perfect') {
       k.state = 'stunned'; k.stunTimer = 2.5;
-      k.hp = Math.max(0, k.hp - 15); setBossHp(k.hp);
-      game.battle.damageNumbers.push({ dmg: 15, x: k.x, y: k.y, age: 0 });
+      const dmg = 12;
+      k.hp = Math.max(15, k.hp - dmg); setBossHp(k.hp);
+      game.battle.damageNumbers.push({ dmg, x: k.x, y: k.y, age: 0 });
+      game.combatStats.perfectDodges++;
     } else if (result === 'good') {
-      p.hp = Math.max(0, p.hp - 3); setPlayerHp(p.hp);
+      // Block — NO damage to player
+      game.combatStats.goodBlocks++;
     } else if (result === 'late') {
-      const dmg = Math.floor(atk.damage * 0.6);
+      const dmg = Math.floor(atk.damage * 0.5);
       if (p.hasShield) { p.hasShield = false; }
-      else { p.hp = Math.max(0, p.hp - dmg); setPlayerHp(p.hp); triggerDmg(); }
+      else { p.hp = Math.max(0, p.hp - dmg); game.combatStats.damageTaken += dmg; setPlayerHp(p.hp); triggerDmg(); }
     } else {
       if (p.hasShield) { p.hasShield = false; }
-      else { p.hp = Math.max(0, p.hp - atk.damage); setPlayerHp(p.hp); triggerDmg(); }
+      else { p.hp = Math.max(0, p.hp - atk.damage); game.combatStats.damageTaken += atk.damage; setPlayerHp(p.hp); triggerDmg(); }
     }
+    game.combatStats.dodgesTotal++;
+
+    // ── PUSHBACK in direction of last QTE arrow ──
+    const seq = game.lastQteSequence;
+    if (seq && seq.length > 0) {
+      const lastDir = seq[seq.length - 1];
+      const pushMap = { up: { dx: -1, dy: -1 }, down: { dx: 1, dy: 1 }, left: { dx: -1, dy: 1 }, right: { dx: 1, dy: -1 } };
+      const push = pushMap[lastDir] || { dx: 0, dy: 0 };
+      const pushForce = 4.0;
+      p.pushVx = push.dx * pushForce;
+      p.pushVy = push.dy * pushForce;
+      p.pushTimer = 0.35;
+    }
+
     k.currentAttack = null;
     k.attackProgress = 0;
     k.state = k.state === 'stunned' ? 'stunned' : 'recovering';
     k.recoverTimer = k.state === 'stunned' ? 0 : atk.recovery;
 
-    // Trigger recovery prompt — player must "catch" themselves
+    // Recovery prompt
     const dirs = ['up', 'down', 'left', 'right'];
     const recDir = dirs[Math.floor(Math.random() * 4)];
     game.recovery = { active: true, direction: recDir, timer: 1.0 };
     setRecoveryState({ direction: recDir, timer: 1.0 });
-  }, []);
+
+    // Check skill unlocks
+    const newUnlocks = checkSkillUnlocks(game.combatStats, game.unlockedSkills);
+    for (const sid of newUnlocks) { triggerSkillUnlock(sid); }
+    setCombatStats({ ...game.combatStats });
+  }, [checkSkillUnlocks, triggerSkillUnlock]);
 
   const triggerDmg = useCallback(() => {
     setDamageFlash(true); setScreenShake(true);
@@ -255,7 +315,6 @@ export default function GameWorld({ onEnding }) {
     } catch { return null; }
   }, []);
 
-  // ─── EQUIPMENT STATS ─────────────────────────────────────
   function getEquipStats(equip) {
     const w = ALL_EQUIPMENT.weapons.find(i => i.id === equip.weapon) || ALL_EQUIPMENT.weapons[0];
     const a = ALL_EQUIPMENT.armor.find(i => i.id === equip.armor) || ALL_EQUIPMENT.armor[0];
@@ -291,7 +350,6 @@ export default function GameWorld({ onEnding }) {
       updateRain(game, dt, W, H);
       updateCamera(game, W, H);
 
-      // RENDER
       ctx.clearRect(0, 0, W, H);
       ctx.fillStyle = '#07090F'; ctx.fillRect(0, 0, W, H);
       if (game.mode === 'explore') renderExplore(ctx, game, W, H);
@@ -301,7 +359,6 @@ export default function GameWorld({ onEnding }) {
       drawVignette(ctx, W, H);
       if (game.cutscene.active) renderCutscene(ctx, game, W, H);
 
-      // Sync UI state
       setSkillCooldowns({ ...game.player.skillCooldowns });
       setMana(Math.floor(game.player.mana));
       setComboDisplay(game.player.comboCount);
@@ -311,7 +368,7 @@ export default function GameWorld({ onEnding }) {
     };
     animFrameRef.current = requestAnimationFrame(loop);
     return () => cancelAnimationFrame(animFrameRef.current);
-  }, [handleDialogue, handleQTEComplete, requestEnemyAction, onEnding, triggerDmg]);
+  }, [handleDialogue, handleQTEComplete, requestEnemyAction, onEnding, triggerDmg, triggerSkillUnlock, checkSkillUnlocks]);
 
   // ─── RECOVERY UPDATE ─────────────────────────────────────
   function updateRecovery(game, dt) {
@@ -319,19 +376,16 @@ export default function GameWorld({ onEnding }) {
     const keys = keysRef.current;
     const kb = keybindsRef.current;
     rec.timer -= dt;
-
     const dirMap = { up: kb.moveUp, down: kb.moveDown, left: kb.moveLeft, right: kb.moveRight };
     const needed = dirMap[rec.direction];
     if (keys[needed]) {
-      rec.active = false;
-      setRecoveryState(null);
+      rec.active = false; setRecoveryState(null);
       game.player.speed = PLAYER_SPEED * 1.4;
       setTimeout(() => { if (gameRef.current) gameRef.current.player.speed = PLAYER_SPEED + getEquipStats(game.player.equipment).speedBonus; }, 600);
       return;
     }
     if (rec.timer <= 0) {
-      rec.active = false;
-      setRecoveryState(null);
+      rec.active = false; setRecoveryState(null);
       game.player.staggerTimer = 0.5;
     }
   }
@@ -342,13 +396,18 @@ export default function GameWorld({ onEnding }) {
     const kb = keybindsRef.current;
     const stats = getEquipStats(p.equipment);
 
-    // Stagger
     if (p.staggerTimer > 0) { p.staggerTimer -= dt; return; }
+    if (p.isInvisible) { p.invisibleTimer -= dt; if (p.invisibleTimer <= 0) p.isInvisible = false; }
 
-    // Invisibility
-    if (p.isInvisible) { p.invisibleTimer -= dt; if (p.invisibleTimer <= 0) { p.isInvisible = false; } }
+    // Pushback from QTE dodge
+    if (p.pushTimer > 0) {
+      p.pushTimer -= dt;
+      const decay = Math.max(0, p.pushTimer / 0.35);
+      p.x = Math.max(0.5, Math.min(BATTLE_ARENA.width - 0.5, p.x + p.pushVx * decay * dt));
+      p.y = Math.max(0.5, Math.min(BATTLE_ARENA.height - 0.5, p.y + p.pushVy * decay * dt));
+    }
 
-    // Movement (isometric WASD via keybinds)
+    // Movement
     let dx = 0, dy = 0;
     if (keys[kb.moveUp]) { dx -= 1; dy -= 1; }
     if (keys[kb.moveDown]) { dx += 1; dy += 1; }
@@ -364,7 +423,6 @@ export default function GameWorld({ onEnding }) {
 
     let speed = p.speed + stats.speedBonus;
 
-    // Mud/hazard slow
     if (game.mode === 'battle') {
       for (const obj of game.battle.objects) {
         if (obj.type === 'mud' && Math.hypot(p.x - obj.x, p.y - obj.y) < (obj.radius || 1.5)) { speed *= 0.45; break; }
@@ -374,16 +432,23 @@ export default function GameWorld({ onEnding }) {
       }
     }
 
-    // Dash
+    // Dash (very short i-frames)
     if (keys[kb.dash] && !p.isDashing && p.stamina >= DASH_STAMINA && (dx !== 0 || dy !== 0)) {
-      p.isDashing = true; p.dashTimer = 0.12; p.stamina -= DASH_STAMINA;
-      p.invincible = 0.18; p.dashTrail = [{ x: p.x, y: p.y, alpha: 0.5 }];
+      p.isDashing = true; p.dashTimer = 0.1; p.stamina -= DASH_STAMINA;
+      p.invincible = 0.08;
+      p.dashTrail = [{ x: p.x, y: p.y, alpha: 0.5 }];
       keys[kb.dash] = false;
+      if (game.mode === 'battle') {
+        game.combatStats.dashCount++;
+        const newUnlocks = checkSkillUnlocks(game.combatStats, game.unlockedSkills);
+        for (const sid of newUnlocks) triggerSkillUnlock(sid);
+        setCombatStats({ ...game.combatStats });
+      }
     }
     if (p.isDashing) {
-      p.dashTimer -= dt; speed *= 3.5;
-      p.dashTrail.push({ x: p.x, y: p.y, alpha: p.dashTimer / 0.12 * 0.4 });
-      if (p.dashTrail.length > 5) p.dashTrail.shift();
+      p.dashTimer -= dt; speed *= 4.0;
+      p.dashTrail.push({ x: p.x, y: p.y, alpha: p.dashTimer / 0.1 * 0.4 });
+      if (p.dashTrail.length > 4) p.dashTrail.shift();
       if (p.dashTimer <= 0) { p.isDashing = false; p.dashTrail = []; }
     }
     if (p.invincible > 0) p.invincible -= dt;
@@ -407,7 +472,6 @@ export default function GameWorld({ onEnding }) {
 
     const nx = p.x + dx * speed * dt;
     const ny = p.y + dy * speed * dt;
-
     if (game.mode === 'explore') {
       const tx = Math.floor(nx), ty = Math.floor(ny);
       if (tx >= 0 && tx < 30 && ty >= 0 && ty < 20 && !SOLID_TILES.includes(VILLAGE_MAP[ty]?.[tx])) { p.x = nx; p.y = ny; }
@@ -426,33 +490,35 @@ export default function GameWorld({ onEnding }) {
       }
       p.lastAttackTime = game.time;
       p.isAttacking = true;
-      const atkSpeed = 0.12 * stats.weaponSpeed;
-      p.attackTimer = Math.max(0.06, atkSpeed - (p.comboCount - 1) * 0.015);
+      p.attackTimer = Math.max(0.06, 0.12 * stats.weaponSpeed - (p.comboCount - 1) * 0.015);
       p.stamina -= ATTACK_STAMINA * stats.weaponSpeed * (1 - (p.comboCount - 1) * 0.08);
 
       const ps = toScreen(p.x, p.y, game.camera.x, game.camera.y);
       p.attackAngle = Math.atan2(mouse.y - ps.y + 10, mouse.x - ps.x);
 
-      // Hit check
       const k = game.battle.kairen;
       const dist = Math.hypot(p.x - k.x, p.y - k.y);
       const hitRange = p.isJumping ? 3.0 : 2.5;
       if (dist < hitRange) {
-        const baseDmg = stats.weaponDmg;
-        let dmg = k.state === 'stunned' ? Math.floor(baseDmg * 2.5) : baseDmg;
-        dmg = Math.floor(dmg * (1 + (p.comboCount - 1) * 0.25));
-        if (p.isJumping) dmg = Math.floor(dmg * 1.5);
-        k.hp = Math.max(0, k.hp - dmg); setBossHp(k.hp);
+        // Reduced damage — Kairen is unbeatable
+        let dmg = k.state === 'stunned' ? Math.floor(stats.weaponDmg * 1.5) : Math.max(2, Math.floor(stats.weaponDmg * 0.5));
+        dmg = Math.floor(dmg * (1 + (p.comboCount - 1) * 0.2));
+        if (p.isJumping) dmg = Math.floor(dmg * 1.3);
+        k.hp = Math.max(15, k.hp - dmg); setBossHp(k.hp);
         game.battle.damageNumbers.push({ dmg, x: k.x + (Math.random() - 0.5), y: k.y + (Math.random() - 0.5), age: 0 });
         if (p.isJumping && p.jumpPhase === 'rising') { p.jumpPhase = 'falling'; p.jumpTimer = 0.1; }
+
+        game.combatStats.hitsLanded++;
+        if (p.comboCount === 3) game.combatStats.fullCombos++;
+        const newUnlocks = checkSkillUnlocks(game.combatStats, game.unlockedSkills);
+        for (const sid of newUnlocks) triggerSkillUnlock(sid);
+        setCombatStats({ ...game.combatStats });
       }
     }
     if (p.isAttacking) { p.attackTimer -= dt; if (p.attackTimer <= 0) p.isAttacking = false; }
-
-    // Combo decay
     if (game.time - p.lastAttackTime > 0.6) p.comboCount = 0;
 
-    // ─── SKILLS (1-5 keys) ────────────────────────────────
+    // ─── SKILLS (1-5 keys, only unlocked) ─────────────────
     if (game.mode === 'battle') {
       for (let i = 0; i < 5; i++) {
         const sk = kb[`skill${i + 1}`];
@@ -460,6 +526,7 @@ export default function GameWorld({ onEnding }) {
           keys[sk] = false;
           const skillId = p.equippedSkills[i];
           if (!skillId) continue;
+          if (!game.unlockedSkills.includes(skillId)) continue;
           const skill = ALL_SKILLS.find(s => s.id === skillId);
           if (!skill) continue;
           if ((p.skillCooldowns[skillId] || 0) > 0) continue;
@@ -469,19 +536,14 @@ export default function GameWorld({ onEnding }) {
           applySkill(game, skill, mouse);
         }
       }
-      // Cooldown tick
       for (const id in p.skillCooldowns) {
         if (p.skillCooldowns[id] > 0) p.skillCooldowns[id] = Math.max(0, p.skillCooldowns[id] - dt);
       }
     }
 
-    // Stamina regen
     if (!p.isAttacking && !p.isDashing) p.stamina = Math.min(MAX_STAMINA, p.stamina + STAMINA_REGEN * dt);
     setStamina(Math.floor(p.stamina));
-
-    // Mana regen (slow, battle only)
     if (game.mode === 'battle') p.mana = Math.min(MAX_MANA + (getEquipStats(p.equipment).manaBonus || 0), p.mana + MANA_REGEN * dt);
-
     if (dx !== 0 || dy !== 0) { if (game.frameCount % 6 === 0) p.frame = (p.frame + 1) % 4; }
   }
 
@@ -490,30 +552,22 @@ export default function GameWorld({ onEnding }) {
     const p = game.player, k = game.battle.kairen;
     const ps = toScreen(p.x, p.y, game.camera.x, game.camera.y);
     const angle = Math.atan2(mouse.y - ps.y, mouse.x - ps.x);
-
     switch (skill.id) {
       case 'flame_dash': {
         p.isDashing = true; p.dashTimer = 0.2; p.invincible = 0.25;
         const dist = Math.hypot(p.x - k.x, p.y - k.y);
-        if (dist < 3) {
-          k.hp = Math.max(0, k.hp - skill.damage); setBossHp(k.hp);
-          game.battle.damageNumbers.push({ dmg: skill.damage, x: k.x, y: k.y, age: 0 });
-        }
+        if (dist < 3) { k.hp = Math.max(15, k.hp - skill.damage); setBossHp(k.hp); game.battle.damageNumbers.push({ dmg: skill.damage, x: k.x, y: k.y, age: 0 }); }
         game.battle.skillEffects.push({ type: 'flame_trail', x: p.x, y: p.y, timer: 0.5, duration: 0.5, color: skill.color });
         break;
       }
       case 'lightning_strike': {
-        const tx = k.x, ty = k.y;
-        k.hp = Math.max(0, k.hp - skill.damage); setBossHp(k.hp);
-        game.battle.damageNumbers.push({ dmg: skill.damage, x: tx, y: ty, age: 0 });
-        game.battle.skillEffects.push({ type: 'lightning', x: tx, y: ty, timer: 0.6, duration: 0.6, color: skill.color });
+        k.hp = Math.max(15, k.hp - skill.damage); setBossHp(k.hp);
+        game.battle.damageNumbers.push({ dmg: skill.damage, x: k.x, y: k.y, age: 0 });
+        game.battle.skillEffects.push({ type: 'lightning', x: k.x, y: k.y, timer: 0.6, duration: 0.6, color: skill.color });
         break;
       }
       case 'wind_slash': {
-        game.battle.projectiles.push({
-          x: p.x, y: p.y, vx: Math.cos(angle) * 14, vy: Math.sin(angle) * 14,
-          life: 1.0, damage: skill.damage, isSkill: true, color: skill.color,
-        });
+        game.battle.projectiles.push({ x: p.x, y: p.y, vx: Math.cos(angle) * 14, vy: Math.sin(angle) * 14, life: 1.0, damage: skill.damage, isSkill: true, color: skill.color });
         break;
       }
       case 'shadow_step': {
@@ -528,10 +582,7 @@ export default function GameWorld({ onEnding }) {
       }
       case 'divine_wrath': {
         const dist = Math.hypot(p.x - k.x, p.y - k.y);
-        if (dist < 4) {
-          k.hp = Math.max(0, k.hp - skill.damage); setBossHp(k.hp);
-          game.battle.damageNumbers.push({ dmg: skill.damage, x: k.x, y: k.y, age: 0 });
-        }
+        if (dist < 4) { k.hp = Math.max(15, k.hp - skill.damage); setBossHp(k.hp); game.battle.damageNumbers.push({ dmg: skill.damage, x: k.x, y: k.y, age: 0 }); }
         game.battle.skillEffects.push({ type: 'explosion', x: p.x, y: p.y, timer: 0.8, duration: 0.8, color: skill.color, radius: 3 });
         break;
       }
@@ -558,6 +609,11 @@ export default function GameWorld({ onEnding }) {
     if (p.x >= BATTLE_TRIGGER.minX && p.x <= BATTLE_TRIGGER.maxX && p.y >= BATTLE_TRIGGER.minY && p.y <= BATTLE_TRIGGER.maxY) {
       game.mode = 'battle'; p.x = BATTLE_ARENA.playerSpawn.x; p.y = BATTLE_ARENA.playerSpawn.y;
       p.hp = p.maxHp; p.stamina = MAX_STAMINA; p.mana = MAX_MANA;
+      // Reset combat stats and skills for this run
+      game.combatStats = { ...DEFAULT_COMBAT_STATS };
+      game.unlockedSkills = [];
+      setUnlockedSkills([]); setEquippedSkills([]);
+      setCombatStats({ ...DEFAULT_COMBAT_STATS });
       setMode('battle'); setPlayerHp(p.maxHp); setBossHp(100);
       setBattleDialogue({ speaker: 'Kairen', text: 'So... the prophecy child dares to face me.' });
       setTimeout(() => setBattleDialogue(null), 3500);
@@ -570,7 +626,11 @@ export default function GameWorld({ onEnding }) {
     const kb = keybindsRef.current;
     game.battle.timer += dt;
 
-    // Pick up rock
+    // Kairen HP regen — he is UNBEATABLE
+    k.hp = Math.min(k.maxHp, k.hp + 1.5 * dt);
+    k.hp = Math.max(15, k.hp);
+    setBossHp(Math.ceil(k.hp));
+
     if (keys[kb.interact]) {
       keys[kb.interact] = false;
       for (const obj of game.battle.objects) {
@@ -579,7 +639,6 @@ export default function GameWorld({ onEnding }) {
         }
       }
     }
-    // Throw rock
     if (keys[kb.throw] && p.inventory.includes('rock')) {
       keys[kb.throw] = false;
       p.inventory.splice(p.inventory.indexOf('rock'), 1); setInventory([...p.inventory]);
@@ -587,19 +646,16 @@ export default function GameWorld({ onEnding }) {
       game.battle.projectiles.push({ x: p.x, y: p.y, vx: Math.cos(a) * 8, vy: Math.sin(a) * 8, life: 1.5 });
     }
 
-    // Projectiles
     game.battle.projectiles = game.battle.projectiles.filter(proj => {
       proj.x += proj.vx * dt; proj.y += proj.vy * dt; proj.life -= dt;
       if (Math.hypot(proj.x - k.x, proj.y - k.y) < 1.5) {
-        const dmg = proj.damage || 10;
-        k.hp = Math.max(0, k.hp - dmg); setBossHp(k.hp);
+        const dmg = proj.damage || 5;
+        k.hp = Math.max(15, k.hp - dmg); setBossHp(k.hp);
         game.battle.damageNumbers.push({ dmg, x: k.x, y: k.y, age: 0 }); return false;
       }
       return proj.life > 0;
     });
     game.battle.damageNumbers = game.battle.damageNumbers.filter(d => { d.age += dt; return d.age < 1; });
-
-    // Skill effects decay
     game.battle.skillEffects = game.battle.skillEffects.filter(e => { e.timer -= dt; return e.timer > 0; });
 
     // ─── KAIREN AI ──────────────────────────────
@@ -615,6 +671,7 @@ export default function GameWorld({ onEnding }) {
           game.qteActive = true;
           const dirs = ['up', 'down', 'left', 'right'];
           const seq = k.qteSequence || Array.from({ length: atk.qteLength }, () => dirs[Math.floor(Math.random() * 4)]);
+          game.lastQteSequence = seq;
           setQte({ sequence: seq }); k.state = 'attacking'; k.attackProgress = 0;
         } else { k.state = 'idle'; k.currentAttack = null; }
       }
@@ -643,7 +700,7 @@ export default function GameWorld({ onEnding }) {
       } else {
         k.aiCooldown -= dt;
         if (k.aiCooldown <= 0) {
-          k.aiCooldown = 1.2 + Math.random() * 1.2;
+          k.aiCooldown = 1.0 + Math.random() * 1.0;
           const attacks = Object.keys(KAIREN_ATTACKS);
           const chosen = attacks[Math.floor(Math.random() * attacks.length)];
           k.currentAttack = chosen; k.state = 'telegraph';
@@ -659,7 +716,7 @@ export default function GameWorld({ onEnding }) {
     }
     if (game.frameCount % 8 === 0) k.frame = (k.frame + 1) % 4;
 
-    // ─── ENDING TRIGGER ─────────────────────────
+    // ─── ENDING TRIGGER (Kairen always wins) ────
     if (!game.battle.finishTriggered && (game.battle.timer > 50 || p.hp <= 6)) {
       game.battle.finishTriggered = true;
       game.cutscene.active = true; game.cutscene.phase = 0; game.cutscene.timer = 0;
@@ -721,7 +778,6 @@ export default function GameWorld({ onEnding }) {
     game.camera.y += (ty - game.camera.y) * 0.08;
   }
 
-  // ─── RENDER EXPLORE ─────────────────────────────────────
   function renderExplore(ctx, game, W, H) {
     const cx = game.camera.x, cy = game.camera.y;
     for (let d = 0; d <= 48; d++) {
@@ -749,7 +805,6 @@ export default function GameWorld({ onEnding }) {
     }
   }
 
-  // ─── RENDER BATTLE ──────────────────────────────────────
   function renderBattle(ctx, game, W, H) {
     const cx = game.camera.x, cy = game.camera.y;
     const aw = BATTLE_ARENA.width, ah = BATTLE_ARENA.height;
@@ -762,9 +817,7 @@ export default function GameWorld({ onEnding }) {
     for (const obj of game.battle.objects) {
       if (obj.type === 'mud' || obj.type === 'hazard') drawIsoBattleObj(ctx, obj, cx, cy);
     }
-    // Skill effects (ground layer)
     for (const ef of game.battle.skillEffects) drawSkillEffect(ctx, ef, cx, cy);
-
     const ents = [];
     ents.push({ t: 'player', d: game.player.x + game.player.y });
     ents.push({ t: 'kairen', d: game.battle.kairen.x + game.battle.kairen.y });
@@ -801,6 +854,7 @@ export default function GameWorld({ onEnding }) {
       {mode === 'battle' && (
         <SkillBar
           equippedSkills={equippedSkills}
+          unlockedSkills={unlockedSkills}
           cooldowns={skillCooldowns}
           mana={mana}
           keybinds={keybinds}
@@ -818,11 +872,16 @@ export default function GameWorld({ onEnding }) {
       {qte && <QTEOverlay sequence={qte.sequence} onComplete={handleQTEComplete} />}
       <AnimatePresence>{damageFlash && <DamageFlash />}</AnimatePresence>
       {recoveryState && <RecoveryPrompt direction={recoveryState.direction} />}
+      <AnimatePresence>
+        {skillNotification && <SkillUnlockNotification skill={skillNotification.skill} />}
+      </AnimatePresence>
       {cutsceneText && <div className="cutscene-text" data-testid="cutscene-text">{cutsceneText}</div>}
       {menuOpen && (
         <GameMenu
           equippedSkills={equippedSkills}
           setEquippedSkills={setEquippedSkills}
+          unlockedSkills={unlockedSkills}
+          combatStats={combatStats}
           equipment={equipment}
           setEquipment={setEquipment}
           keybinds={keybinds}
