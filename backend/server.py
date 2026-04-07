@@ -7,7 +7,6 @@ import logging
 from pathlib import Path
 from pydantic import BaseModel, Field
 from typing import List, Optional, Dict, Any
-import uuid
 from datetime import datetime, timezone
 
 ROOT_DIR = Path(__file__).parent
@@ -27,15 +26,16 @@ npc_brain = NPCBrain()
 class ChatRequest(BaseModel):
     npc_id: str
     player_message: str
+    tone: Optional[str] = "neutral"
+    reputation: Optional[int] = 0
     context: Optional[Dict[str, Any]] = None
-
 
 class ChatResponse(BaseModel):
     npc_id: str
     response: str
     emotion: str = "neutral"
     action: Optional[str] = None
-
+    reputation_change: int = 0
 
 class BattleActionRequest(BaseModel):
     player_action: str
@@ -44,13 +44,16 @@ class BattleActionRequest(BaseModel):
     player_hp: int
     environment: Dict[str, Any]
 
-
 class BattleActionResponse(BaseModel):
     action: str
     dialogue: str = ""
     telegraph: Optional[str] = None
     qte_sequence: Optional[List[str]] = None
 
+class ReputationUpdate(BaseModel):
+    player_id: str
+    change: int
+    reason: str
 
 class GameSaveRequest(BaseModel):
     player_id: str
@@ -61,15 +64,15 @@ class GameSaveRequest(BaseModel):
 async def root():
     return {"message": "Odyssey's Wrath - Game API"}
 
-
 @api_router.post("/npc/chat", response_model=ChatResponse)
 async def npc_chat(req: ChatRequest):
-    memory = await db.npc_memory.find_one(
-        {"npc_id": req.npc_id}, {"_id": 0}
-    )
+    memory = await db.npc_memory.find_one({"npc_id": req.npc_id}, {"_id": 0})
+    rep = req.reputation or 0
     response = await npc_brain.chat(
         npc_id=req.npc_id,
         player_message=req.player_message,
+        tone=req.tone or "neutral",
+        reputation=rep,
         context=req.context,
         memory=memory
     )
@@ -77,18 +80,20 @@ async def npc_chat(req: ChatRequest):
         {"npc_id": req.npc_id},
         {"$push": {"interactions": {
             "player": req.player_message,
+            "tone": req.tone,
             "npc": response["response"],
             "ts": datetime.now(timezone.utc).isoformat()
         }}},
         upsert=True
     )
+    rep_change = {"kind": 1, "aggressive": -1, "cunning": 0, "neutral": 0}.get(req.tone, 0)
     return ChatResponse(
         npc_id=req.npc_id,
         response=response["response"],
         emotion=response.get("emotion", "neutral"),
-        action=response.get("action")
+        action=response.get("action"),
+        reputation_change=rep_change
     )
-
 
 @api_router.post("/battle/enemy-action", response_model=BattleActionResponse)
 async def enemy_action(req: BattleActionRequest):
@@ -101,48 +106,37 @@ async def enemy_action(req: BattleActionRequest):
     )
     return BattleActionResponse(**result)
 
+@api_router.post("/reputation/update")
+async def update_reputation(req: ReputationUpdate):
+    await db.reputation.update_one(
+        {"player_id": req.player_id},
+        {"$inc": {"reputation": req.change}, "$push": {"history": {"change": req.change, "reason": req.reason, "ts": datetime.now(timezone.utc).isoformat()}}},
+        upsert=True
+    )
+    doc = await db.reputation.find_one({"player_id": req.player_id}, {"_id": 0})
+    return {"reputation": doc.get("reputation", 0) if doc else 0}
+
+@api_router.get("/reputation/{player_id}")
+async def get_reputation(player_id: str):
+    doc = await db.reputation.find_one({"player_id": player_id}, {"_id": 0})
+    return {"reputation": doc.get("reputation", 0) if doc else 0}
 
 @api_router.post("/game/save")
 async def save_game(req: GameSaveRequest):
-    doc = {
-        "player_id": req.player_id,
-        "game_state": req.game_state,
-        "saved_at": datetime.now(timezone.utc).isoformat()
-    }
-    await db.game_saves.update_one(
-        {"player_id": req.player_id},
-        {"$set": doc},
-        upsert=True
-    )
+    doc = {"player_id": req.player_id, "game_state": req.game_state, "saved_at": datetime.now(timezone.utc).isoformat()}
+    await db.game_saves.update_one({"player_id": req.player_id}, {"$set": doc}, upsert=True)
     return {"status": "saved"}
-
 
 @api_router.get("/game/load/{player_id}")
 async def load_game(player_id: str):
-    save = await db.game_saves.find_one(
-        {"player_id": player_id}, {"_id": 0}
-    )
-    if save:
-        return save
-    return {"status": "no_save_found"}
+    save = await db.game_saves.find_one({"player_id": player_id}, {"_id": 0})
+    return save if save else {"status": "no_save_found"}
 
 
 app.include_router(api_router)
-
-app.add_middleware(
-    CORSMiddleware,
-    allow_credentials=True,
-    allow_origins=os.environ.get('CORS_ORIGINS', '*').split(','),
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
-
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
-)
+app.add_middleware(CORSMiddleware, allow_credentials=True, allow_origins=os.environ.get('CORS_ORIGINS', '*').split(','), allow_methods=["*"], allow_headers=["*"])
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
-
 
 @app.on_event("shutdown")
 async def shutdown_db_client():

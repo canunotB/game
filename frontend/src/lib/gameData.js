@@ -1,122 +1,71 @@
-// Tile types
-export const TILES = {
-  GRASS: 0,
-  PATH: 1,
-  TREE: 2,
-  ROCK: 3,
-  CLIFF: 4,
-  BUILDING: 5,
-  WATER: 6,
-  MUD: 7,
-  FLOWERS: 8,
-};
-
-// Solid tiles (can't walk through)
+export const TILES = { GRASS: 0, PATH: 1, TREE: 2, ROCK: 3, CLIFF: 4, BUILDING: 5, WATER: 6, MUD: 7, FLOWERS: 8, RUINS: 9 };
 export const SOLID_TILES = [TILES.TREE, TILES.ROCK, TILES.CLIFF, TILES.BUILDING, TILES.WATER];
-
 export const TILE_SIZE = 48;
-export const PLAYER_SPEED = 3.5;
-export const KAIREN_SPEED = 2.2;
+export const PLAYER_SPEED = 4.5;
+export const KAIREN_SPEED = 3.2;
+export const MAX_STAMINA = 100;
+export const MAX_MANA = 60;
+export const ATTACK_STAMINA = 8;
+export const DASH_STAMINA = 16;
+export const STAMINA_REGEN = 42;
+export const MANA_REGEN = 5;
 
-// Village map (30x20 tiles)
 // prettier-ignore
 export const VILLAGE_MAP = [
-  [2,2,2,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,2,2],
-  [2,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,8,0,0,0,0,0,0,0,0,0,2],
-  [2,0,0,0,0,2,0,0,0,0,0,5,5,5,0,0,0,0,0,0,0,2,0,0,0,0,0,0,0,2],
-  [2,0,0,0,0,0,0,0,0,0,0,5,5,5,0,0,0,0,0,0,0,0,0,0,0,0,2,0,0,4],
-  [2,0,0,2,0,0,0,0,1,1,1,1,1,1,1,1,1,0,0,0,0,0,0,0,0,0,0,0,0,4],
-  [2,0,0,0,0,0,0,1,1,0,0,0,0,0,0,0,1,1,0,0,0,0,0,0,2,0,0,0,0,4],
-  [4,0,0,0,0,0,1,1,0,0,0,8,0,0,0,0,0,1,1,0,0,0,0,0,0,0,0,0,1,1],
-  [4,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,1,1,0],
-  [4,0,8,0,0,1,1,0,0,0,0,0,0,0,0,0,0,0,1,1,0,0,0,0,0,0,1,1,0,0],
-  [4,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,1,1,0,0,0],
-  [4,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,1,1,0,0,0,1,1,0,0,0,4],
-  [4,0,0,2,0,1,1,0,0,0,0,0,0,0,0,0,0,0,1,1,0,0,0,1,1,0,0,0,0,4],
-  [2,0,0,0,0,0,1,1,0,0,0,0,0,0,0,0,0,1,1,0,0,0,0,0,0,0,0,0,0,4],
-  [2,0,0,0,0,0,0,1,1,1,0,0,0,8,0,0,1,1,0,0,0,0,0,0,0,0,0,0,0,4],
-  [2,0,8,0,2,0,0,0,0,1,1,1,1,1,1,1,1,0,0,0,0,0,2,0,0,0,0,0,0,2],
-  [2,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,2,0,2],
-  [2,0,0,0,0,0,0,5,5,5,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,2],
-  [2,0,0,0,2,0,0,5,5,5,0,0,0,0,0,0,2,0,0,0,0,0,0,2,0,0,0,0,0,2],
-  [2,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,2],
-  [2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2],
+[4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4],
+[4,0,2,0,0,0,0,2,0,0,0,0,0,9,0,0,0,0,0,2,0,0,0,0,0,0,0,2,0,4],
+[4,0,0,5,5,0,0,0,0,1,1,1,5,5,5,0,0,0,0,0,0,5,5,0,0,0,0,0,0,4],
+[4,2,0,5,5,0,0,1,1,1,0,0,5,5,5,0,0,2,0,0,0,5,5,0,0,2,0,0,0,4],
+[4,0,0,0,0,0,1,1,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,4],
+[4,0,2,0,0,1,1,0,0,8,0,0,0,1,0,0,0,0,0,0,0,0,2,0,0,0,1,1,1,4],
+[4,0,0,0,1,1,0,0,0,0,0,0,0,1,0,9,0,0,0,0,0,0,0,0,0,1,1,0,0,4],
+[4,0,8,0,1,0,0,0,6,6,0,0,0,1,1,1,1,1,1,0,0,0,0,0,1,1,0,0,0,1],
+[4,0,0,0,1,0,0,0,6,6,0,0,0,0,0,0,0,0,1,1,0,0,0,1,1,0,0,0,0,1],
+[4,0,0,1,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,1,0,1,1,0,0,0,0,0,4],
+[4,2,0,1,0,0,0,0,0,0,3,0,0,0,0,0,0,0,0,0,1,1,1,0,0,0,0,2,0,4],
+[4,0,0,1,0,0,0,0,0,0,0,0,0,0,0,2,0,0,0,0,0,0,0,0,0,0,0,0,0,4],
+[4,0,0,1,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,2,0,0,0,0,4],
+[4,0,0,0,1,1,0,0,9,0,0,0,0,0,8,0,0,0,0,0,0,0,0,0,0,0,0,0,0,4],
+[4,2,0,0,0,1,1,5,5,0,0,0,0,0,0,0,5,5,0,0,0,2,0,0,0,0,0,0,0,4],
+[4,0,0,0,0,0,1,5,5,0,0,0,0,0,0,0,5,5,0,0,0,0,0,0,0,2,0,0,0,4],
+[4,0,0,0,0,1,1,0,0,0,8,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,4],
+[4,0,2,0,0,1,0,0,0,2,0,0,0,0,2,0,0,0,0,2,0,0,0,2,0,0,0,0,0,4],
+[4,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,4],
+[4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4],
 ];
 
 export const VILLAGE_NPCS = [
-  {
-    id: 'elder_theron',
-    name: 'Elder Theron',
-    x: 10,
-    y: 8,
-    sprite: 'elder',
-    dialogue: [
-      "The winds carry a dark omen today...",
-      "Child, the gods have spoken your name.",
-    ],
-  },
-  {
-    id: 'lyra',
-    name: 'Lyra',
-    x: 15,
-    y: 11,
-    sprite: 'girl',
-    dialogue: [
-      "H-have you seen him? The warrior in dark armor...",
-      "Please don't go east... he's waiting there...",
-    ],
-  },
+  { id: 'elder_theron', name: 'Elder Theron', x: 10, y: 7, sprite: 'elder' },
+  { id: 'lyra', name: 'Lyra', x: 16, y: 10, sprite: 'girl' },
 ];
 
-// Battle arena exit trigger (east side of village)
-export const BATTLE_TRIGGER = { minX: 27, minY: 6, maxX: 29, maxY: 10 };
+export const BATTLE_TRIGGER = { minX: 27, minY: 5, maxX: 29, maxY: 8 };
 
-// Battle arena objects
 export const BATTLE_ARENA = {
-  width: 22,
-  height: 16,
-  playerSpawn: { x: 4, y: 12 },
-  kairenSpawn: { x: 18, y: 4 },
+  width: 24, height: 18,
+  playerSpawn: { x: 5, y: 14 },
+  kairenSpawn: { x: 19, y: 4 },
   objects: [
     { type: 'rock_small', x: 3, y: 6, pickable: true },
-    { type: 'rock_small', x: 8, y: 14, pickable: true },
-    { type: 'rock_small', x: 16, y: 10, pickable: true },
-    { type: 'rock_small', x: 19, y: 13, pickable: true },
-    { type: 'rock_large', x: 12, y: 3, pickable: false },
+    { type: 'rock_small', x: 9, y: 15, pickable: true },
+    { type: 'rock_small', x: 17, y: 11, pickable: true },
+    { type: 'rock_small', x: 21, y: 14, pickable: true },
+    { type: 'rock_large', x: 12, y: 3 },
     { type: 'tree', x: 6, y: 4 },
-    { type: 'tree', x: 17, y: 8 },
-    { type: 'tree', x: 10, y: 12 },
-    { type: 'mud', x: 9, y: 7, radius: 1.8 },
-    { type: 'mud', x: 15, y: 12, radius: 1.5 },
+    { type: 'tree', x: 18, y: 9 },
+    { type: 'tree', x: 11, y: 13 },
+    { type: 'mud', x: 9, y: 8, radius: 1.8 },
+    { type: 'mud', x: 16, y: 13, radius: 1.5 },
+    { type: 'hazard', x: 4, y: 10, radius: 1.2 },
+    { type: 'hazard', x: 20, y: 6, radius: 1.0 },
+    { type: 'hazard', x: 13, y: 16, radius: 1.3 },
   ],
 };
 
 export const KAIREN_ATTACKS = {
-  heavy_slash: {
-    name: 'Heavy Slash',
-    damage: 15,
-    range: 2.5,
-    telegraph: 1.2,
-    recovery: 1.5,
-    qteLength: 3,
-  },
-  thrust: {
-    name: 'Piercing Thrust',
-    damage: 10,
-    range: 3,
-    telegraph: 0.7,
-    recovery: 0.8,
-    qteLength: 2,
-  },
-  shield_bash: {
-    name: 'Shield Bash',
-    damage: 8,
-    range: 1.8,
-    telegraph: 0.5,
-    recovery: 1.0,
-    qteLength: 2,
-    knockback: 3,
-  },
+  heavy_slash: { name: 'Heavy Slash', damage: 18, range: 3, telegraph: 1.0, recovery: 1.2, qteLength: 3 },
+  thrust: { name: 'Piercing Thrust', damage: 12, range: 3.5, telegraph: 0.6, recovery: 0.7, qteLength: 2 },
+  shield_bash: { name: 'Shield Bash', damage: 10, range: 2, telegraph: 0.4, recovery: 0.8, qteLength: 2, knockback: 3 },
 };
 
 export const STORY_LINES = [
@@ -144,27 +93,82 @@ export const ENDING_LINES = [
   "You survived.",
 ];
 
-export const QTE_ARROWS = {
-  up: '\u2191',
-  down: '\u2193',
-  left: '\u2190',
-  right: '\u2192',
+export const QTE_ARROWS = { up: '\u2191', down: '\u2193', left: '\u2190', right: '\u2192' };
+export const QTE_KEYS = { ArrowUp: 'up', ArrowDown: 'down', ArrowLeft: 'left', ArrowRight: 'right' };
+
+export const DIALOGUE_TONES = {
+  kind: { label: 'Kind', color: '#4ade80', repChange: 1 },
+  neutral: { label: 'Neutral', color: '#94A3B8', repChange: 0 },
+  aggressive: { label: 'Aggressive', color: '#ef4444', repChange: -1 },
+  cunning: { label: 'Cunning', color: '#a78bfa', repChange: 0 },
 };
 
-export const QTE_KEYS = {
-  ArrowUp: 'up',
-  ArrowDown: 'down',
-  ArrowLeft: 'left',
-  ArrowRight: 'right',
+export const NPC_DIALOGUE_OPTIONS = {
+  elder_theron: [
+    { tone: 'kind', text: "Are you alright, Elder? You seem troubled." },
+    { tone: 'neutral', text: "What do you know about the prophecy?" },
+    { tone: 'aggressive', text: "Tell me where Kairen is. Now." },
+    { tone: 'cunning', text: "What's in it for me if I face this warrior?" },
+  ],
+  lyra: [
+    { tone: 'kind', text: "Don't worry, I'll be careful." },
+    { tone: 'neutral', text: "Have you seen anyone suspicious?" },
+    { tone: 'aggressive', text: "Move. I don't have time for this." },
+    { tone: 'cunning', text: "You know more than you're letting on." },
+  ],
 };
 
-export const COLORS = {
-  grass: ['#2d5016', '#2a4c14', '#325a18', '#284812'],
-  path: ['#8B7355', '#7d6749', '#937d5f'],
-  mud: 'rgba(74, 60, 49, 0.7)',
-  water: '#1a3a5c',
-  cliff: '#3d3d3d',
-  building: '#5c4a3a',
-  rain: 'rgba(100, 160, 255, 0.35)',
-  sky_dark: '#07090F',
+export function getReputationTitle(rep) {
+  if (rep <= -5) return 'Feared';
+  if (rep <= -2) return 'Distrusted';
+  if (rep < 2) return 'Unknown';
+  if (rep < 5) return 'Respected';
+  return 'Revered';
+}
+
+// ─── SKILLS ──────────────────────────────────────────────
+export const ALL_SKILLS = [
+  { id: 'flame_dash', name: 'Flame Dash', icon: 'F', manaCost: 12, cooldown: 3, damage: 8, desc: 'Dash forward leaving fire', type: 'movement', color: '#ff6030' },
+  { id: 'lightning_strike', name: 'Lightning', icon: 'L', manaCost: 15, cooldown: 4, damage: 14, desc: 'Strike from the sky', type: 'ranged', color: '#ffd700' },
+  { id: 'wind_slash', name: 'Wind Slash', icon: 'W', manaCost: 8, cooldown: 2, damage: 10, desc: 'Quick cutting gust', type: 'melee', color: '#80d0ff' },
+  { id: 'shadow_step', name: 'Shadow Step', icon: 'S', manaCost: 10, cooldown: 5, damage: 0, desc: 'Vanish briefly', type: 'utility', color: '#8040c0' },
+  { id: 'earth_shield', name: 'Earth Shield', icon: 'E', manaCost: 14, cooldown: 6, damage: 0, desc: 'Block one hit', type: 'defense', color: '#8a7030' },
+  { id: 'divine_wrath', name: 'Divine Wrath', icon: 'D', manaCost: 20, cooldown: 8, damage: 18, desc: 'Devastating blast', type: 'ranged', color: '#c0a0ff' },
+  { id: 'healing_light', name: 'Heal', icon: 'H', manaCost: 18, cooldown: 10, damage: 0, healAmount: 15, desc: 'Restore vitality', type: 'heal', color: '#4ade80' },
+];
+
+export const DEFAULT_EQUIPPED_SKILLS = ['flame_dash', 'lightning_strike', 'wind_slash', 'earth_shield', 'healing_light'];
+
+// ─── EQUIPMENT ───────────────────────────────────────────
+export const ALL_EQUIPMENT = {
+  weapons: [
+    { id: 'wooden_sword', name: 'Wooden Sword', damage: 6, speed: 1.0, desc: 'A simple training blade' },
+    { id: 'bronze_blade', name: 'Bronze Blade', damage: 10, speed: 0.85, desc: 'Sharp and well-balanced' },
+  ],
+  armor: [
+    { id: 'cloth_tunic', name: 'Cloth Tunic', defense: 0, desc: 'Basic clothing' },
+    { id: 'leather_armor', name: 'Leather Armor', defense: 3, desc: 'Light protection' },
+  ],
+  accessories: [
+    { id: 'none', name: 'None', desc: 'No accessory equipped' },
+    { id: 'swift_boots', name: 'Swift Boots', speedBonus: 0.5, desc: 'Move faster' },
+    { id: 'mana_charm', name: 'Mana Charm', manaBonus: 15, desc: '+15 max mana' },
+  ],
+};
+
+export const DEFAULT_EQUIPMENT = { weapon: 'wooden_sword', armor: 'cloth_tunic', accessory: 'none' };
+
+// ─── KEYBINDS ────────────────────────────────────────────
+export const DEFAULT_KEYBINDS = {
+  moveUp: 'w', moveDown: 's', moveLeft: 'a', moveRight: 'd',
+  dash: 'shift', jump: ' ', interact: 'e', throw: 'q',
+  skill1: '1', skill2: '2', skill3: '3', skill4: '4', skill5: '5',
+  menu: 'tab',
+};
+
+export const KEYBIND_LABELS = {
+  moveUp: 'Move Up', moveDown: 'Move Down', moveLeft: 'Move Left', moveRight: 'Move Right',
+  dash: 'Dash', jump: 'Jump', interact: 'Interact', throw: 'Throw',
+  skill1: 'Skill 1', skill2: 'Skill 2', skill3: 'Skill 3', skill4: 'Skill 4', skill5: 'Skill 5',
+  menu: 'Menu',
 };
