@@ -1,34 +1,477 @@
-.App-logo {
-    height: 40vmin;
-    pointer-events: none;
+/* Game Container */
+.game-container {
+  width: 100vw;
+  height: 100vh;
+  position: relative;
+  overflow: hidden;
+  background: var(--bg-base);
 }
 
-@media (prefers-reduced-motion: no-preference) {
-    .App-logo {
-        animation: App-logo-spin infinite 20s linear;
-    }
+/* Canvas */
+.game-canvas {
+  display: block;
+  image-rendering: pixelated;
+  image-rendering: crisp-edges;
+  cursor: none;
 }
 
-.App-header {
-    background-color: #0f0f10;
-    min-height: 100vh;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    font-size: calc(10px + 2vmin);
-    color: white;
+/* Title Screen */
+.title-screen {
+  width: 100vw;
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  background: var(--bg-base);
+  position: relative;
+  overflow: hidden;
 }
 
-.App-link {
-    color: #61dafb;
+.title-rain {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 1;
 }
 
-@keyframes App-logo-spin {
-    from {
-        transform: rotate(0deg);
-    }
-    to {
-        transform: rotate(360deg);
-    }
+.rain-drop {
+  position: absolute;
+  width: 1px;
+  background: linear-gradient(transparent, var(--brand-rain));
+  opacity: 0.3;
+  animation: rain-fall linear infinite;
+}
+
+@keyframes rain-fall {
+  0% { transform: translateY(-100vh); }
+  100% { transform: translateY(100vh); }
+}
+
+.title-content {
+  position: relative;
+  z-index: 2;
+  text-align: center;
+}
+
+.title-text {
+  font-family: 'Cormorant Garamond', serif;
+  font-size: clamp(3rem, 8vw, 7rem);
+  font-weight: 300;
+  letter-spacing: 0.1em;
+  color: var(--text-accent);
+  text-shadow: 0 0 40px rgba(197, 160, 89, 0.4), 0 0 80px rgba(197, 160, 89, 0.1);
+  line-height: 1;
+  margin-bottom: 1.5rem;
+}
+
+.title-subtitle {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.75rem;
+  letter-spacing: 0.3em;
+  text-transform: uppercase;
+  color: var(--text-secondary);
+  margin-bottom: 4rem;
+}
+
+.title-prompt {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.7rem;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--text-secondary);
+  animation: pulse-glow 2s ease-in-out infinite;
+}
+
+@keyframes pulse-glow {
+  0%, 100% { opacity: 0.4; }
+  50% { opacity: 1; color: var(--text-accent); }
+}
+
+/* Story Intro */
+.story-overlay {
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.95);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 100;
+  padding: 3rem;
+}
+
+.story-text {
+  font-family: 'Cormorant Garamond', serif;
+  font-size: clamp(1.2rem, 3vw, 2rem);
+  line-height: 1.8;
+  color: var(--text-primary);
+  max-width: 700px;
+  text-align: center;
+  opacity: 0.9;
+}
+
+.story-skip {
+  position: absolute;
+  bottom: 2rem;
+  right: 2rem;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.65rem;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--text-secondary);
+  opacity: 0.5;
+}
+
+/* HUD */
+.game-hud {
+  position: absolute;
+  top: 1.5rem;
+  left: 1.5rem;
+  z-index: 50;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  pointer-events: none;
+}
+
+.hp-label {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.6rem;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--text-secondary);
+  margin-bottom: 0.2rem;
+}
+
+.hp-bar-container {
+  width: 200px;
+  height: 6px;
+  background: rgba(255, 255, 255, 0.08);
+  position: relative;
+  overflow: hidden;
+}
+
+.hp-bar-fill {
+  height: 100%;
+  background: var(--brand-primary);
+  transition: width 0.4s ease;
+  position: relative;
+}
+
+.hp-bar-fill.low {
+  background: var(--brand-danger);
+}
+
+.hp-text {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.65rem;
+  color: var(--text-secondary);
+  margin-top: 0.15rem;
+}
+
+/* Boss Bar */
+.boss-bar {
+  position: absolute;
+  top: 1.5rem;
+  right: 1.5rem;
+  z-index: 50;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  pointer-events: none;
+}
+
+.boss-name {
+  font-family: 'Cormorant Garamond', serif;
+  font-size: 1.1rem;
+  font-weight: 500;
+  color: var(--brand-danger);
+  letter-spacing: 0.1em;
+  margin-bottom: 0.3rem;
+  text-shadow: 0 0 20px rgba(217, 45, 32, 0.3);
+}
+
+.boss-hp-container {
+  width: 300px;
+  height: 4px;
+  background: rgba(255, 255, 255, 0.08);
+  position: relative;
+  overflow: hidden;
+}
+
+.boss-hp-fill {
+  height: 100%;
+  background: var(--brand-danger);
+  transition: width 0.3s ease;
+  position: absolute;
+  right: 0;
+}
+
+/* Dialogue Box */
+.dialogue-box {
+  position: absolute;
+  bottom: 2rem;
+  left: 2rem;
+  width: calc(100% - 4rem);
+  max-width: 700px;
+  padding: 1.5rem 2rem;
+  background: rgba(0, 0, 0, 0.88);
+  backdrop-filter: blur(16px);
+  border-left: 3px solid var(--brand-primary);
+  z-index: 60;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.8);
+}
+
+.dialogue-speaker {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.6rem;
+  letter-spacing: 0.25em;
+  text-transform: uppercase;
+  color: var(--text-accent);
+  margin-bottom: 0.5rem;
+}
+
+.dialogue-text {
+  font-family: 'Cormorant Garamond', serif;
+  font-size: 1.25rem;
+  line-height: 1.6;
+  color: var(--text-primary);
+}
+
+.dialogue-continue {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.55rem;
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+  color: var(--text-secondary);
+  margin-top: 0.8rem;
+  opacity: 0.6;
+  animation: pulse-glow 1.5s ease-in-out infinite;
+}
+
+/* QTE System */
+.qte-overlay {
+  position: absolute;
+  top: 35%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 70;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1rem;
+  pointer-events: none;
+}
+
+.qte-label {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.6rem;
+  letter-spacing: 0.3em;
+  text-transform: uppercase;
+  color: var(--brand-danger);
+  animation: flash-text 0.3s ease-in-out infinite alternate;
+}
+
+@keyframes flash-text {
+  0% { opacity: 0.6; }
+  100% { opacity: 1; }
+}
+
+.qte-arrows {
+  display: flex;
+  gap: 0.75rem;
+}
+
+.qte-arrow {
+  width: 56px;
+  height: 56px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.5rem;
+  font-weight: 700;
+  border: 2px solid rgba(255, 255, 255, 0.15);
+  background: rgba(0, 0, 0, 0.8);
+  color: var(--text-secondary);
+  backdrop-filter: blur(8px);
+  transition: all 0.15s ease;
+  font-family: 'JetBrains Mono', monospace;
+}
+
+.qte-arrow.active {
+  border-color: var(--brand-danger);
+  color: var(--brand-danger);
+  box-shadow: 0 0 20px rgba(217, 45, 32, 0.4), inset 0 0 10px rgba(217, 45, 32, 0.1);
+  transform: scale(1.15);
+}
+
+.qte-arrow.success {
+  border-color: #22c55e;
+  color: #22c55e;
+  background: rgba(34, 197, 94, 0.1);
+}
+
+.qte-arrow.failed {
+  border-color: var(--brand-danger);
+  color: var(--brand-danger);
+  background: rgba(217, 45, 32, 0.2);
+  opacity: 0.5;
+}
+
+.qte-timer {
+  width: 200px;
+  height: 3px;
+  background: rgba(255, 255, 255, 0.1);
+  overflow: hidden;
+}
+
+.qte-timer-fill {
+  height: 100%;
+  background: var(--brand-danger);
+  transition: width 0.05s linear;
+}
+
+.qte-result {
+  font-family: 'Cormorant Garamond', serif;
+  font-size: 2rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.15em;
+  text-shadow: 0 0 30px currentColor;
+}
+
+.qte-result.perfect { color: #fbbf24; }
+.qte-result.good { color: #22c55e; }
+.qte-result.miss { color: var(--brand-danger); }
+
+/* Environment Prompt */
+.env-prompt {
+  position: absolute;
+  z-index: 55;
+  padding: 0.4rem 0.8rem;
+  background: rgba(18, 21, 28, 0.92);
+  backdrop-filter: blur(8px);
+  border: 1px solid var(--border-subtle);
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.6rem;
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+  color: var(--text-primary);
+  white-space: nowrap;
+  pointer-events: none;
+}
+
+.env-prompt .key {
+  color: var(--text-accent);
+  font-weight: 700;
+}
+
+/* Damage Flash */
+.damage-flash {
+  position: absolute;
+  inset: 0;
+  background: rgba(217, 45, 32, 0.25);
+  pointer-events: none;
+  z-index: 80;
+  animation: damage-pulse 0.3s ease-out forwards;
+}
+
+@keyframes damage-pulse {
+  0% { opacity: 1; }
+  100% { opacity: 0; }
+}
+
+/* Screen Shake Container */
+.screen-shake {
+  animation: shake 0.2s ease-out;
+}
+
+@keyframes shake {
+  0%, 100% { transform: translate(0, 0); }
+  25% { transform: translate(-4px, 2px); }
+  50% { transform: translate(3px, -3px); }
+  75% { transform: translate(-2px, 1px); }
+}
+
+/* Controls Help */
+.controls-help {
+  position: absolute;
+  bottom: 1rem;
+  right: 1rem;
+  z-index: 45;
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  pointer-events: none;
+}
+
+.control-hint {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.5rem;
+  letter-spacing: 0.1em;
+  color: var(--text-secondary);
+  opacity: 0.4;
+  text-align: right;
+}
+
+.control-hint .key-bind {
+  color: var(--text-accent);
+  opacity: 1;
+}
+
+/* Ending Screen */
+.ending-screen {
+  width: 100vw;
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  background: var(--bg-base);
+  position: relative;
+}
+
+.ending-text {
+  font-family: 'Cormorant Garamond', serif;
+  font-size: clamp(1.2rem, 3vw, 2rem);
+  line-height: 2;
+  color: var(--text-primary);
+  max-width: 600px;
+  text-align: center;
+  opacity: 0.85;
+}
+
+.ending-title {
+  font-family: 'Cormorant Garamond', serif;
+  font-size: clamp(2rem, 5vw, 4rem);
+  font-weight: 300;
+  color: var(--text-accent);
+  margin-bottom: 2rem;
+  text-shadow: 0 0 30px rgba(197, 160, 89, 0.3);
+}
+
+/* Inventory */
+.inventory-display {
+  position: absolute;
+  top: 5rem;
+  left: 1.5rem;
+  z-index: 50;
+  display: flex;
+  gap: 0.3rem;
+  pointer-events: none;
+}
+
+.inv-slot {
+  width: 36px;
+  height: 36px;
+  border: 1px solid var(--border-subtle);
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.9rem;
+}
+
+.inv-slot.active {
+  border-color: var(--text-accent);
 }
