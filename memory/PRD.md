@@ -1,66 +1,83 @@
 # Odyssey's Wrath - PRD
 
 ## Original Problem Statement
-Build an indie RPG with fun fight mechanics and AI as town NPCs + battle NPC reasoning and speech. Monster battles with quick fights using environmental-based strategy. Environment affects battles: rocks to pick up, trees for cover, rain that slows movement. Inspired by Pokemon Black & White art style with 3D-like feel.
+Build an indie RPG demo with Elden Ring-style dark isometric aesthetic, fun fight mechanics, environmental strategy, and AI-powered NPCs. Story inspired by The Odyssey where an 8-year-old protagonist is fated to be killed by boss Kairen. Features: fast-paced Sonic Forces-style combat with M1 combo attacks, dashing, jumping attack, stamina/mana, skills system, dialogue tones with reputation, and a scripted loss cutscene.
 
 ## Architecture
-- **Frontend**: React + HTML5 Canvas (2D pixel art rendering with depth sorting)
+- **Frontend**: React + HTML5 Canvas (Isometric 2.5D rendering with depth sorting)
 - **Backend**: FastAPI with OpenAI GPT-5.2 via Emergent LLM Key
-- **Database**: MongoDB (NPC memory, game saves)
-- **Game Engine**: Custom Canvas2D engine with game loop, entity system, weather, QTE
-
-## User Personas
-- Indie RPG fans who enjoy strategic environmental combat
-- Players who enjoy AI-driven NPC interactions
-- Story-driven gamers (Odyssey-inspired narrative)
+- **Database**: MongoDB (NPC memory, reputation, game saves)
+- **Game Engine**: Custom Canvas2D isometric engine with game loop, entity system, weather, QTE, skills, combo system
 
 ## Core Requirements
-- Explorable village with AI NPCs (dialogue + memory)
-- Environmental combat arena (rocks, trees, mud, rain)
-- QTE battle mechanics with telegraphed attacks
+- Explorable isometric village with AI NPCs (dialogue with tone choices + memory)
+- Environmental combat arena (rocks, trees, mud, hazards, rain)
+- Fast-paced combo attack system (M1 click, 3-hit chains)
+- Jump + plunge attack (Space bar)
+- 5 equippable skills (1-5 keys) from pool of 7
+- Equipment system (weapon/armor/accessory)
+- Customizable keybinds
+- QTE battle mechanics with post-QTE recovery prompt ("catch yourself")
 - Boss fight with Kairen (stoic knight-guardian)
-- Odyssey-inspired story (prophecy, young protagonist)
+- Stamina/Mana bars with regen
+- Reputation tracking from dialogue choices
+- Scripted loss cutscene (ravine fall)
 
-## What's Been Implemented (Feb 2026)
-- **Title Screen**: Cinematic "ODYSSEY'S WRATH" with rain animation
-- **Story Intro**: Typewriter-effect narrative (11 lines, Odyssey-themed)
-- **Village Exploration**: 30x20 tile map with paths, trees, buildings, cliffs
-- **AI NPCs**: Elder Theron + Lyra with LLM-powered dialogue (GPT-5.2)
-- **NPC Memory**: MongoDB-backed conversation history
-- **Battle Arena**: Open field with rocks (pickable), trees (cover), mud (slow)
-- **Boss Fight**: Kairen with 3 attack types, telegraph system, QTE combat
-- **QTE System**: Arrow key sequences with Perfect/Good/Miss grading
-- **Environmental Strategy**: Pick up & throw rocks, hide behind trees, mud slowdown
-- **Weather**: Rain particle system across all scenes
-- **HUD**: Player vitality bar, boss HP bar, inventory, controls help
-- **Ending**: Scripted loss → ravine fall → "To Be Continued" narrative
-- **Backend**: NPC chat API, battle AI API, save/load system
+## What's Been Implemented
+
+### Phase 1 (Initial Build)
+- Title Screen with rain animation
+- Story intro with typewriter effect
+- Village exploration (30x20 isometric tile map)
+- AI NPCs (Elder Theron + Lyra) with GPT-5.2 dialogue
+- NPC Memory via MongoDB
+- Battle arena with environmental objects
+- Boss fight with Kairen (3 attack types + telegraph)
+- QTE dodge system
+- Weather (rain particles) + fog + vignette
+- Basic HUD + ending cutscene
+
+### Phase 2 (Combat & Systems Overhaul - Current)
+- Isometric 2.5D rendering engine
+- 3-hit combo attack system (M1 click chains)
+- Jump mechanic (Space) with plunge attack bonus damage
+- Dash (Shift) with i-frames and afterimages
+- Stamina/Mana system with regen
+- Skills system: 7 skills (Flame Dash, Lightning, Wind Slash, Shadow Step, Earth Shield, Divine Wrath, Heal), 5 equippable
+- Skill visual effects (fire trail, lightning bolt, explosion, heal particles, shield glow, shadow)
+- Equipment system: weapons (Wooden Sword / Bronze Blade), armor (Cloth Tunic / Leather Armor), accessories (Swift Boots / Mana Charm)
+- Full menu system (Tab): Skills equip/unequip, Equipment cycle, Keybind rebinding
+- Post-QTE recovery mechanic ("CATCH!" direction prompt)
+- Combo indicator UI
+- Skill bar UI (bottom-center, shows cooldowns + mana costs)
+- Movement bug fix (clear keys on window blur)
+- Tone-based dialogue with reputation tracking
+- Configurable keybinds with localStorage persistence
+- Equipment stat modifiers (weapon damage/speed, armor defense, accessory bonuses)
+
+## Key API Endpoints
+- `POST /api/npc/chat` - AI NPC dialogue with tone/reputation
+- `POST /api/battle/enemy-action` - AI battle decisions
+- `POST /api/reputation/update` - Update player reputation
+- `GET /api/reputation/{player_id}` - Get reputation
+- `POST /api/game/save` - Save game state
+- `GET /api/game/load/{player_id}` - Load game state
 
 ## Prioritized Backlog
-### P0 (Critical)
-- All core features implemented ✓
-
 ### P1 (High)
-- More monster encounters beyond Kairen
-- Expanded village with more NPCs and quests
+- More environmental hazards across battlefield
 - Sound effects and music
-- Player leveling/stats system
+- More monster encounters beyond Kairen
+- Expanded village with more NPCs
 
 ### P2 (Medium)
 - More battle arenas with different environments
-- Inventory system (weapons, potions)
+- Player leveling/stats/XP system
 - NPC schedules/routines
-- Multiplayer elements
+- Additional story chapters
 
 ### P3 (Low)
 - Mobile touch controls
 - Save/load UI
+- Sprite sheet animations
 - Achievement system
-- Sprite sheet animations (replace procedural art)
-
-## Next Tasks
-1. Add more monster encounters with varied AI behaviors
-2. Expand the village map with more areas to explore
-3. Implement sound/music system
-4. Add player progression (XP, levels, abilities)
-5. Create additional story chapters beyond the demo
