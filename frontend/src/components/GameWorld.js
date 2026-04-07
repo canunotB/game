@@ -8,6 +8,7 @@ import {
   NPC_DIALOGUE_OPTIONS, DIALOGUE_TONES,
   ALL_SKILLS, ALL_EQUIPMENT, DEFAULT_EQUIPMENT, DEFAULT_KEYBINDS,
   SKILL_UNLOCK_CONDITIONS, SKILL_UNLOCK_ORDER, DEFAULT_COMBAT_STATS,
+  ENEMY_SPECIES, VILLAGE_ENEMIES, ARENA_ENEMIES,
 } from '../lib/gameData';
 import {
   toScreen, drawIsoTile, drawIsoTree, drawIsoPlayer, drawIsoKairen, drawIsoNPC,
@@ -15,6 +16,7 @@ import {
   drawDamageNumber, drawKairenAttack, drawFadeOverlay,
   drawFallingPlayer, drawSkillEffect,
   drawKairenSwingTelegraph, drawKairenSwingArc, drawEmpoweredAura, drawQTETelegraph,
+  drawEnemy, drawEnemyNameTag,
 } from '../lib/renderer';
 import {
   PlayerHUD, BossBar, DialogueBox, QTEOverlay,
@@ -121,6 +123,17 @@ export default function GameWorld({ onEnding }) {
       lastQteSequence: null,
       dialogueActive: false, qteActive: false, frameCount: 0, time: 0, reputation: 0,
       menuOpen: false,
+      // Enemies in the village
+      villageEnemies: VILLAGE_ENEMIES.map(e => {
+        const spec = ENEMY_SPECIES[e.species];
+        return {
+          ...e, hp: spec.hp, maxHp: spec.hp, name: spec.name,
+          dir: 'down', frame: 0, state: 'patrol',
+          patrolTimer: Math.random() * 3, patrolDir: Math.random() * Math.PI * 2,
+          aggroRange: 4, alive: true, deathTimer: 0,
+        };
+      }),
+      arenaEnemies: [],
     };
     gameRef.current = game;
     for (let i = 0; i < 120; i++) {
@@ -541,10 +554,17 @@ export default function GameWorld({ onEnding }) {
       game.combatStats = { ...DEFAULT_COMBAT_STATS }; game.unlockedSkills = [];
       setUnlockedSkills([]); setEquippedSkills([]); setCombatStats({ ...DEFAULT_COMBAT_STATS });
       const k = game.battle.kairen; k.hp = 100; k.phaseUnlocked = 1; k.lowestHp = 100; k.empowered = false;
+      // Spawn arena enemies
+      game.arenaEnemies = ARENA_ENEMIES.map(e => {
+        const spec = ENEMY_SPECIES[e.species];
+        return { ...e, hp: spec.hp, maxHp: spec.hp, name: spec.name, dir: 'down', frame: 0, state: 'idle', alive: false, spawnCountdown: e.spawnTimer, deathTimer: 0 };
+      });
       setMode('battle'); setPlayerHp(p.maxHp); setBossHp(100);
       setBattleDialogue({ speaker: 'Kairen', text: 'So... the prophecy child dares to face me.' });
       setTimeout(() => setBattleDialogue(null), 3500);
     }
+    // Update village enemies (patrol / aggro)
+    updateVillageEnemies(game);
   }
 
   // ─── BATTLE UPDATE (with real-time swings + phases) ──────
@@ -689,6 +709,92 @@ export default function GameWorld({ onEnding }) {
       game.cutscene.active = true; game.cutscene.phase = 0; game.cutscene.timer = 0;
       setCutsceneText('Enough.');
     }
+    // Update arena sub-enemies
+    updateArenaEnemies(game, dt);
+  }
+
+  // ─── VILLAGE ENEMIES ──────────────────────────────────────
+  function updateVillageEnemies(game) {
+    const p = game.player;
+    for (const e of game.villageEnemies) {
+      if (!e.alive) continue;
+      const spec = ENEMY_SPECIES[e.species];
+      const dist = Math.hypot(p.x - e.x, p.y - e.y);
+
+      if (dist < e.aggroRange) {
+        // Chase player
+        const a = Math.atan2(p.y - e.y, p.x - e.x);
+        const sp = spec.speed * 0.4; // Slower in village
+        e.x += Math.cos(a) * sp * 0.016;
+        e.y += Math.sin(a) * sp * 0.016;
+        // Contact damage
+        if (dist < 1.2 && p.invincible <= 0 && !p.hasShield) {
+          p.hp = Math.max(0, p.hp - spec.damage * 0.016);
+          setPlayerHp(Math.ceil(p.hp));
+        }
+      } else {
+        // Patrol
+        e.patrolTimer -= 0.016;
+        if (e.patrolTimer <= 0) {
+          e.patrolDir = Math.random() * Math.PI * 2;
+          e.patrolTimer = 2 + Math.random() * 3;
+        }
+        if (e.patrol) {
+          const nx = e.x + Math.cos(e.patrolDir) * spec.speed * 0.2 * 0.016;
+          const ny = e.y + Math.sin(e.patrolDir) * spec.speed * 0.2 * 0.016;
+          const tx = Math.floor(nx), ty = Math.floor(ny);
+          if (tx >= 1 && tx < 29 && ty >= 1 && ty < 19 && !SOLID_TILES.includes(VILLAGE_MAP[ty]?.[tx])) {
+            e.x = nx; e.y = ny;
+          } else { e.patrolDir += Math.PI; }
+        }
+      }
+      // Clamp to map
+      e.x = Math.max(1, Math.min(28, e.x));
+      e.y = Math.max(1, Math.min(18, e.y));
+    }
+  }
+
+  function updateArenaEnemies(game, dt) {
+    const p = game.player;
+    for (const e of game.arenaEnemies) {
+      if (!e.alive) {
+        // Spawn countdown
+        if (e.spawnCountdown > 0) {
+          e.spawnCountdown -= dt;
+          if (e.spawnCountdown <= 0) {
+            e.alive = true;
+            const spec = ENEMY_SPECIES[e.species];
+            e.hp = spec.hp; e.maxHp = spec.hp;
+          }
+        }
+        continue;
+      }
+      const spec = ENEMY_SPECIES[e.species];
+      const dist = Math.hypot(p.x - e.x, p.y - e.y);
+      // Chase
+      if (dist > 1.5) {
+        const a = Math.atan2(p.y - e.y, p.x - e.x);
+        e.x += Math.cos(a) * spec.speed * 0.5 * dt;
+        e.y += Math.sin(a) * spec.speed * 0.5 * dt;
+      }
+      // Contact damage
+      if (dist < 1.5 && p.invincible <= 0 && !p.hasShield) {
+        p.hp = Math.max(0, p.hp - spec.damage * dt * 0.5);
+        setPlayerHp(Math.ceil(p.hp));
+      }
+      // Player can damage enemies with attacks
+      if (p.isAttacking && dist < 2.5) {
+        const stats = getEquipStats(p.equipment);
+        e.hp -= stats.weaponDmg * dt * 3;
+        game.battle.damageNumbers.push({ dmg: Math.floor(stats.weaponDmg * 0.5), x: e.x, y: e.y, age: 0 });
+        if (e.hp <= 0) {
+          e.alive = false;
+          e.deathTimer = 1;
+        }
+      }
+      e.x = Math.max(1, Math.min(BATTLE_ARENA.width - 1, e.x));
+      e.y = Math.max(1, Math.min(BATTLE_ARENA.height - 1, e.y));
+    }
   }
 
   // ─── CUTSCENE ───────────────────────────────────────────
@@ -732,11 +838,13 @@ export default function GameWorld({ onEnding }) {
     for (let y = 0; y < 20; y++) for (let x = 0; x < 30; x++) if (VILLAGE_MAP[y]?.[x] === TILES.TREE) ents.push({ t: 'tree', x, y, d: x + y + 0.5 });
     ents.push({ t: 'player', d: game.player.x + game.player.y });
     for (const npc of game.npcs) ents.push({ t: 'npc', data: npc, d: npc.x + npc.y });
+    for (const e of game.villageEnemies) { if (e.alive) ents.push({ t: 'enemy', data: e, d: e.x + e.y }); }
     ents.sort((a, b) => a.d - b.d);
     for (const e of ents) {
       if (e.t === 'tree') drawIsoTree(ctx, e.x, e.y, cx, cy);
       else if (e.t === 'player') { const p = game.player; drawIsoPlayer(ctx, p.x, p.y, p.dir, p.frame, cx, cy, p.isAttacking, p.attackAngle, p.isDashing, p.dashTrail, 0, p.comboCount, false); }
       else if (e.t === 'npc') drawIsoNPC(ctx, e.data, cx, cy, game.frameCount);
+      else if (e.t === 'enemy') { drawEnemy(ctx, e.data, cx, cy, game.frameCount); drawEnemyNameTag(ctx, e.data, cx, cy); }
     }
   }
 
@@ -767,6 +875,7 @@ export default function GameWorld({ onEnding }) {
       }
     }
     for (const proj of game.battle.projectiles) ents.push({ t: 'proj', data: proj, d: proj.x + proj.y });
+    for (const e of game.arenaEnemies) { if (e.alive) ents.push({ t: 'enemy', data: e, d: e.x + e.y }); }
     ents.sort((a, b) => a.d - b.d);
     for (const e of ents) {
       if (e.t === 'player') drawIsoPlayer(ctx, p.x, p.y, p.dir, p.frame, cx, cy, p.isAttacking, p.attackAngle, p.isDashing, p.dashTrail, p.jumpHeight, p.comboCount, p.isInvisible);
@@ -778,6 +887,7 @@ export default function GameWorld({ onEnding }) {
       else if (e.t === 'tree') drawIsoTree(ctx, e.x, e.y, cx, cy);
       else if (e.t === 'obj') drawIsoBattleObj(ctx, e.data, cx, cy);
       else if (e.t === 'proj') drawProjectile(ctx, e.data, cx, cy);
+      else if (e.t === 'enemy') { drawEnemy(ctx, e.data, cx, cy, game.frameCount); drawEnemyNameTag(ctx, e.data, cx, cy); }
     }
     for (const d of game.battle.damageNumbers) drawDamageNumber(ctx, d.dmg, d.x, d.y, d.age, cx, cy);
   }

@@ -68,8 +68,8 @@ export function DialogueBox({ speaker, text, isTyping, choices, onChoose }) {
   );
 }
 
-// ─── QTE System ──────────────────────────────────────────
-export function QTEOverlay({ sequence, onComplete }) {
+// ─── QTE System (Parry / Dodge / Barrage) ────────────────
+export function QTEOverlay({ sequence, attackType, onComplete }) {
   const [currentIdx, setCurrentIdx] = useState(0);
   const [results, setResults] = useState([]);
   const [timeLeft, setTimeLeft] = useState(100);
@@ -77,18 +77,25 @@ export function QTEOverlay({ sequence, onComplete }) {
   const doneRef = { current: false };
   const startRef = { current: Date.now() };
   const keyRef = { current: Date.now() };
+  const isBarrage = attackType === 'barrage';
 
   useEffect(() => {
     startRef.current = Date.now();
     keyRef.current = Date.now();
-    const totalTime = 2000 + sequence.length * 500;
+    // Parry = very tight, Dodge = moderate, Barrage = longer
+    const totalTime = attackType === 'parry' ? 1200 : attackType === 'dodge' ? 2000 + sequence.length * 400 : 2500 + sequence.length * 350;
     const timer = setInterval(() => {
       const pct = Math.max(0, 100 - ((Date.now() - startRef.current) / totalTime) * 100);
       setTimeLeft(pct);
-      if (pct <= 0 && !doneRef.current) { doneRef.current = true; clearInterval(timer); onComplete('miss'); }
+      if (pct <= 0 && !doneRef.current) {
+        doneRef.current = true; clearInterval(timer);
+        // On timeout: count remaining arrows as missed
+        const missed = sequence.length - results.length;
+        onComplete('miss', missed);
+      }
     }, 50);
     return () => clearInterval(timer);
-  }, [sequence, onComplete]);
+  }, [sequence, attackType, onComplete, results.length]);
 
   const handleKey = useCallback((e) => {
     if (doneRef.current) return;
@@ -96,6 +103,7 @@ export function QTEOverlay({ sequence, onComplete }) {
     if (!pressed) return;
     const expected = sequence[currentIdx];
     const dt = Date.now() - keyRef.current;
+
     if (pressed === expected) {
       const grade = dt < 180 ? 'perfect' : dt < 400 ? 'good' : 'late';
       const nr = [...results, grade];
@@ -105,38 +113,68 @@ export function QTEOverlay({ sequence, onComplete }) {
         doneRef.current = true;
         const p = nr.filter(r => r === 'perfect').length;
         const g = nr.filter(r => r === 'good').length;
-        const final = p === sequence.length ? 'perfect' : p + g === sequence.length ? 'good' : 'late';
+        const missed = nr.filter(r => r === 'miss').length;
+        const final = p === sequence.length ? 'perfect' : (p + g) === sequence.length ? 'good' : missed > 0 ? 'miss' : 'late';
         setShowResult(final);
-        setTimeout(() => onComplete(final), 500);
+        setTimeout(() => onComplete(final, missed), 500);
       } else { setCurrentIdx(i => i + 1); }
     } else {
-      doneRef.current = true;
-      setResults([...results, 'miss']);
-      setShowResult('miss');
-      setTimeout(() => onComplete('miss'), 400);
+      if (isBarrage) {
+        // Barrage: wrong key counts as miss but CONTINUES
+        const nr = [...results, 'miss'];
+        setResults(nr);
+        keyRef.current = Date.now();
+        if (currentIdx + 1 >= sequence.length) {
+          doneRef.current = true;
+          const missed = nr.filter(r => r === 'miss').length;
+          const final = missed === 0 ? 'perfect' : 'miss';
+          setShowResult(final);
+          setTimeout(() => onComplete(final, missed), 500);
+        } else { setCurrentIdx(i => i + 1); }
+      } else {
+        // Parry / Dodge: wrong key = immediate fail
+        doneRef.current = true;
+        setResults([...results, 'miss']);
+        setShowResult('miss');
+        setTimeout(() => onComplete('miss', 1), 400);
+      }
     }
-  }, [currentIdx, results, sequence, onComplete]);
+  }, [currentIdx, results, sequence, onComplete, isBarrage]);
 
   useEffect(() => {
     window.addEventListener('keydown', handleKey);
     return () => window.removeEventListener('keydown', handleKey);
   }, [handleKey]);
 
+  const label = attackType === 'parry' ? 'PARRY!' : attackType === 'dodge' ? 'DODGE!' : 'SURVIVE!';
+  const labelColor = attackType === 'parry' ? '#ffa020' : attackType === 'dodge' ? '#ff4040' : '#a060ff';
+  const missedSoFar = results.filter(r => r === 'miss').length;
+
+  const resultText = () => {
+    if (showResult === 'perfect') return attackType === 'parry' ? 'PERFECT PARRY!' : attackType === 'dodge' ? 'DODGED!' : 'SURVIVED!';
+    if (showResult === 'good') return attackType === 'parry' ? 'PARRIED!' : 'BLOCKED!';
+    if (showResult === 'late') return 'GRAZED';
+    return attackType === 'parry' ? 'BROKEN!' : attackType === 'barrage' ? `HIT x${missedSoFar}` : 'HIT!';
+  };
+
   return (
     <div className="qte-overlay" data-testid="qte-overlay">
-      <div className="qte-label">REACT!</div>
-      <div className="qte-arrows">
+      <div className="qte-label" style={{ color: labelColor }} data-testid="qte-label">{label}</div>
+      <div className={`qte-arrows ${sequence.length > 6 ? 'qte-arrows-compact' : ''}`}>
         {sequence.map((arrow, i) => (
-          <div key={i} className={`qte-arrow ${i === currentIdx && !showResult ? 'active' : i < currentIdx ? (results[i] === 'miss' ? 'failed' : 'success') : ''}`} data-testid={`qte-arrow-${i}`}>
+          <div key={i} className={`qte-arrow ${sequence.length > 6 ? 'qte-arrow-sm' : ''} ${i === currentIdx && !showResult ? 'active' : i < currentIdx ? (results[i] === 'miss' ? 'failed' : 'success') : ''}`} data-testid={`qte-arrow-${i}`}>
             {QTE_ARROWS[arrow]}
           </div>
         ))}
       </div>
-      <div className="qte-timer"><div className="qte-timer-fill" style={{ width: `${timeLeft}%` }} data-testid="qte-timer" /></div>
+      {isBarrage && missedSoFar > 0 && !showResult && (
+        <div className="qte-miss-counter" data-testid="qte-miss-counter">Missed: {missedSoFar}</div>
+      )}
+      <div className="qte-timer"><div className="qte-timer-fill" style={{ width: `${timeLeft}%`, background: attackType === 'barrage' ? 'linear-gradient(90deg, #6020c0, #a060ff)' : undefined }} data-testid="qte-timer" /></div>
       <AnimatePresence>
         {showResult && (
           <motion.div className={`qte-result ${showResult}`} initial={{ scale: 0.5, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ opacity: 0 }} data-testid="qte-result">
-            {showResult === 'perfect' ? 'PERFECT COUNTER!' : showResult === 'good' ? 'BLOCKED!' : showResult === 'late' ? 'GRAZED' : 'HIT!'}
+            {resultText()}
           </motion.div>
         )}
       </AnimatePresence>

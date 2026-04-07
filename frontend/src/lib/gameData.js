@@ -201,3 +201,89 @@ export const KEYBIND_LABELS = {
   skill1: 'Skill 1', skill2: 'Skill 2', skill3: 'Skill 3', skill4: 'Skill 4', skill5: 'Skill 5',
   menu: 'Menu',
 };
+
+// ─── ENEMY SPECIES ───────────────────────────────────────
+export const ENEMY_SPECIES = {
+  stone_warden: {
+    name: 'Stone Warden', hp: 40, speed: 1.5, damage: 8, range: 2.5,
+    attacks: ['rock_slam', 'quake_stomp', 'shoulder_bash'],
+    passive: 'armored_hide', deathEffect: 'shatter',
+    desc: 'Hulking gargoyle with heavy club',
+    colors: { body: '#5a5a62', accent: '#3a3a40', glow: '#8a8a6a' },
+  },
+  cliff_raptor: {
+    name: 'Cliff Raptor', hp: 22, speed: 4.5, damage: 6, range: 2,
+    attacks: ['swift_strike', 'talon_dive', 'shriek'],
+    passive: 'evasive', deathEffect: 'feather_burst',
+    desc: 'Fast avian with razor claws',
+    colors: { body: '#6a4a30', accent: '#c09050', glow: '#e0c080' },
+  },
+  spineback_lurker: {
+    name: 'Spineback Lurker', hp: 28, speed: 2.8, damage: 7, range: 5,
+    attacks: ['spine_toss', 'cling_bite', 'void_surge'],
+    passive: 'spiked_carapace', deathEffect: 'spike_explode',
+    desc: 'Barbed creature that burrows and ambushes',
+    colors: { body: '#4a3a2a', accent: '#8a6040', glow: '#c08050' },
+  },
+  fungal_brute: {
+    name: 'Fungal Brute', hp: 35, speed: 2.0, damage: 10, range: 2,
+    attacks: ['pummel', 'spore_cloud', 'leap_smash'],
+    passive: 'spore_regen', deathEffect: 'toxic_mushrooms',
+    desc: 'Mushroom beast that poisons the air',
+    colors: { body: '#3a5030', accent: '#6a9050', glow: '#90c060' },
+  },
+  glider_imp: {
+    name: 'Glider Imp', hp: 16, speed: 5.0, damage: 5, range: 4,
+    attacks: ['flying_slash', 'wing_gust', 'hex_shot'],
+    passive: 'agile', deathEffect: 'smoke_puff',
+    desc: 'Nimble flying trickster',
+    colors: { body: '#5a3060', accent: '#9060a0', glow: '#c080e0' },
+  },
+  ravine_gnasher: {
+    name: 'Ravine Gnasher', hp: 30, speed: 3.2, damage: 9, range: 2.5,
+    attacks: ['chomp', 'jaw_ram', 'bone_toss'],
+    passive: 'pack_leader', deathEffect: 'death_cry',
+    desc: 'Reptilian pack hunter with crushing jaws',
+    colors: { body: '#5a4030', accent: '#8a6040', glow: '#c08050' },
+  },
+  wraithshade: {
+    name: 'Wraithshade', hp: 20, speed: 2.0, damage: 7, range: 3,
+    attacks: ['night_shroud', 'phantom_blade', 'fade_leap'],
+    passive: 'shadow_cloak', deathEffect: 'dark_mist',
+    desc: 'Spectral shade that teleports and blinds',
+    colors: { body: '#1a1a2e', accent: '#3a3a5a', glow: '#6060a0' },
+  },
+  stone_drake: {
+    name: 'Stone Drake', hp: 45, speed: 1.8, damage: 12, range: 4,
+    attacks: ['rock_breath', 'tail_sweep', 'charged_roar'],
+    passive: 'ambush', deathEffect: 'debris_explosion',
+    desc: 'Winged drake that breathes stone shards',
+    colors: { body: '#4a4a3a', accent: '#6a6a5a', glow: '#a0a080' },
+  },
+};
+
+// ─── TOWNS ───────────────────────────────────────────────
+export const TOWNS = {
+  cliffgate: { name: 'Cliffgate', biome: 'canyon', desc: 'Canyon gate town at the ravine entrance', enemies: ['stone_warden', 'cliff_raptor'] },
+  timbercross: { name: 'Timbercross', biome: 'forest', desc: 'Pine forest border settlement', enemies: ['fungal_brute', 'spineback_lurker'] },
+  stonebridge: { name: 'Stonebridge', biome: 'river', desc: 'River crossing village with ancient bridges', enemies: ['ravine_gnasher', 'cliff_raptor'] },
+  ashenvale: { name: 'Ashenvale', biome: 'volcanic', desc: 'Volcanic outpost near smoldering peaks', enemies: ['stone_drake', 'glider_imp'] },
+  frostwind: { name: 'Frostwind', biome: 'snow', desc: 'Snowy peak settlement battered by storms', enemies: ['wraithshade', 'stone_warden'] },
+  mossgrove: { name: 'Mossgrove', biome: 'swamp', desc: 'Swamp town overgrown with fungi', enemies: ['fungal_brute', 'spineback_lurker'] },
+  sunspire: { name: 'Sunspire', biome: 'desert', desc: 'Deserted shrine city in endless sand', enemies: ['glider_imp', 'wraithshade'] },
+  ironfall: { name: 'Ironfall', biome: 'mountain', desc: 'Mountain mining outpost deep underground', enemies: ['stone_drake', 'ravine_gnasher'] },
+};
+
+// Enemies present in the starting village
+export const VILLAGE_ENEMIES = [
+  { id: 'se1', species: 'cliff_raptor', x: 22, y: 4, patrol: true },
+  { id: 'se2', species: 'spineback_lurker', x: 4, y: 14, patrol: true },
+  { id: 'se3', species: 'fungal_brute', x: 20, y: 14, patrol: false },
+  { id: 'se4', species: 'glider_imp', x: 14, y: 3, patrol: true },
+];
+
+// Enemies in the battle arena (reinforcements / sub-bosses)
+export const ARENA_ENEMIES = [
+  { id: 'ae1', species: 'stone_warden', x: 4, y: 4, spawnTimer: 15 },
+  { id: 'ae2', species: 'ravine_gnasher', x: 20, y: 15, spawnTimer: 25 },
+];

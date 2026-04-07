@@ -68,6 +68,10 @@
 .qte-result.perfect { color: #fbbf24; }
 .qte-result.good { color: #22c55e; }
 .qte-result.miss { color: #D92D20; }
+.qte-result.late { color: #f59e0b; }
+.qte-arrows-compact { gap: 0.3rem; flex-wrap: wrap; justify-content: center; max-width: 380px; }
+.qte-arrow-sm { width: 36px; height: 36px; font-size: 1rem; }
+.qte-miss-counter { font-family: 'JetBrains Mono', monospace; font-size: 0.55rem; letter-spacing: 0.15em; color: #D92D20; text-transform: uppercase; }
 
 /* Env Prompt */
 .env-prompt { position: absolute; z-index: 55; padding: 0.35rem 0.7rem; background: rgba(18,21,28,0.92); backdrop-filter: blur(8px); border: 1px solid rgba(255,255,255,0.08); font-family: 'JetBrains Mono', monospace; font-size: 0.55rem; letter-spacing: 0.12em; text-transform: uppercase; color: #F8FAFC; white-space: nowrap; pointer-events: none; }
