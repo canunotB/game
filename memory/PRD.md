@@ -1,80 +1,72 @@
 # Odyssey's Wrath - PRD
 
 ## Original Problem Statement
-Build an indie RPG demo with Elden Ring-style dark isometric aesthetic, fun fight mechanics, environmental strategy, and AI-powered NPCs. Story inspired by The Odyssey where an 8-year-old protagonist is fated to be killed by boss Kairen. Features: fast-paced Sonic Forces-style combat with M1 combo attacks, dashing, jumping attack, stamina/mana, skills system, dialogue tones with reputation, and a scripted loss cutscene.
+Build an indie RPG demo with Elden Ring-style dark isometric aesthetic, fun fight mechanics, environmental strategy, and AI-powered NPCs. Story inspired by The Odyssey where an 8-year-old protagonist is fated to be killed by boss Kairen. Features: fast-paced Sonic Forces-style combat, combo attacks, dashing with tight i-frames, jumping attacks, skills earned through combat mastery, equipment system, customizable keybinds, QTE dodge with post-dodge recovery + pushback, and a scripted loss cutscene.
 
 ## Architecture
 - **Frontend**: React + HTML5 Canvas (Isometric 2.5D rendering with depth sorting)
 - **Backend**: FastAPI with OpenAI GPT-5.2 via Emergent LLM Key
 - **Database**: MongoDB (NPC memory, reputation, game saves)
-- **Game Engine**: Custom Canvas2D isometric engine with game loop, entity system, weather, QTE, skills, combo system
+- **Game Engine**: Custom Canvas2D isometric engine with combo system, skill tree, equipment, QTE + recovery
 
-## Core Requirements
-- Explorable isometric village with AI NPCs (dialogue with tone choices + memory)
-- Environmental combat arena (rocks, trees, mud, hazards, rain)
-- Fast-paced combo attack system (M1 click, 3-hit chains)
-- Jump + plunge attack (Space bar)
-- 5 equippable skills (1-5 keys) from pool of 7
-- Equipment system (weapon/armor/accessory)
-- Customizable keybinds
-- QTE battle mechanics with post-QTE recovery prompt ("catch yourself")
-- Boss fight with Kairen (stoic knight-guardian)
-- Stamina/Mana bars with regen
-- Reputation tracking from dialogue choices
-- Scripted loss cutscene (ravine fall)
+## Core Design Principles
+- **Kairen is UNBEATABLE** — HP floors at 15, regens slowly. Battle always ends with scripted loss.
+- **Skills earned, not given** — All 7 skills start locked. Unlock through combat mastery (dashing, hitting, blocking, perfect counters, surviving damage).
+- **Kairen attacks = massive visual spectacle** — Blue-white crystalline energy bursts inspired by pixel art reference.
+- **Player attacks = subtle** — Thin gold slash lines, understated.
+- **QTE dodges push you** — After each dodge, player slides in the direction of the last QTE arrow.
 
 ## What's Been Implemented
 
 ### Phase 1 (Initial Build)
-- Title Screen with rain animation
-- Story intro with typewriter effect
-- Village exploration (30x20 isometric tile map)
-- AI NPCs (Elder Theron + Lyra) with GPT-5.2 dialogue
-- NPC Memory via MongoDB
-- Battle arena with environmental objects
-- Boss fight with Kairen (3 attack types + telegraph)
-- QTE dodge system
-- Weather (rain particles) + fog + vignette
-- Basic HUD + ending cutscene
+- Title Screen with rain + story intro
+- Isometric village (30x20 tile map) with AI NPCs (Elder Theron, Lyra)
+- GPT-5.2 powered NPC dialogue with tone choices + reputation
+- Battle arena with environmental objects (rocks, trees, mud, hazards)
+- Boss Kairen with 3 attack types, telegraph, QTE system
+- Weather, fog, vignette effects
+- Ending cutscene (ravine fall)
 
-### Phase 2 (Combat & Systems Overhaul - Current)
-- Isometric 2.5D rendering engine
-- 3-hit combo attack system (M1 click chains)
-- Jump mechanic (Space) with plunge attack bonus damage
-- Dash (Shift) with i-frames and afterimages
-- Stamina/Mana system with regen
-- Skills system: 7 skills (Flame Dash, Lightning, Wind Slash, Shadow Step, Earth Shield, Divine Wrath, Heal), 5 equippable
-- Skill visual effects (fire trail, lightning bolt, explosion, heal particles, shield glow, shadow)
-- Equipment system: weapons (Wooden Sword / Bronze Blade), armor (Cloth Tunic / Leather Armor), accessories (Swift Boots / Mana Charm)
-- Full menu system (Tab): Skills equip/unequip, Equipment cycle, Keybind rebinding
-- Post-QTE recovery mechanic ("CATCH!" direction prompt)
-- Combo indicator UI
-- Skill bar UI (bottom-center, shows cooldowns + mana costs)
-- Movement bug fix (clear keys on window blur)
-- Tone-based dialogue with reputation tracking
-- Configurable keybinds with localStorage persistence
-- Equipment stat modifiers (weapon damage/speed, armor defense, accessory bonuses)
+### Phase 2 (Combat Systems)
+- 3-hit M1 combo system
+- Jump (Space) with plunge attack
+- Dash (Shift) with afterimages
+- Stamina/Mana bars
+- Menu system (Tab): Equipment + Keybinds
+
+### Phase 3 (Current - Combat Mastery Overhaul)
+- **Kairen unbeatable**: HP floors at 15, regens at 1.5/s, player damage reduced
+- **QTE fix**: Perfect = 0 dmg + counter stun, Good = 0 dmg (block), Late = 50% dmg, Miss = full dmg
+- **QTE pushback**: Player pushed in direction of last QTE arrow after every dodge
+- **Skill tree**: 7 skills unlocked through combat mastery conditions:
+  - Flame Dash (Dash 4x), Wind Slash (Hit 8x), Earth Shield (Block 2x)
+  - Lightning (2 full combos), Shadow Step (2 perfect counters)
+  - Divine Wrath (5 perfect counters), Heal (Survive 40 damage)
+- **Skill unlock notifications**: "SKILL AWAKENED" popup with animation
+- **Dash i-frames**: Very tight 0.08s window
+- **Kairen visuals**: Massive blue-white crystalline energy arcs, shards, shockwaves
+- **Player visuals**: Subtle thin gold slash lines
+- **Post-QTE recovery**: "CATCH!" directional prompt (speed boost on success, stagger on fail)
+- **Movement fix**: Window blur clears stuck keys
 
 ## Key API Endpoints
-- `POST /api/npc/chat` - AI NPC dialogue with tone/reputation
-- `POST /api/battle/enemy-action` - AI battle decisions
-- `POST /api/reputation/update` - Update player reputation
-- `GET /api/reputation/{player_id}` - Get reputation
-- `POST /api/game/save` - Save game state
-- `GET /api/game/load/{player_id}` - Load game state
+- `POST /api/npc/chat` — AI NPC dialogue
+- `POST /api/battle/enemy-action` — AI battle decisions
+- `POST /api/reputation/update` — Update reputation
+- `GET /api/reputation/{player_id}` — Get reputation
+- `POST /api/game/save` / `GET /api/game/load/{player_id}`
 
 ## Prioritized Backlog
 ### P1 (High)
 - More environmental hazards across battlefield
 - Sound effects and music
-- More monster encounters beyond Kairen
 - Expanded village with more NPCs
 
 ### P2 (Medium)
-- More battle arenas with different environments
-- Player leveling/stats/XP system
-- NPC schedules/routines
+- Multiple battle arenas
+- Player leveling/XP system
 - Additional story chapters
+- NPC schedules/routines
 
 ### P3 (Low)
 - Mobile touch controls
