@@ -247,20 +247,20 @@ export default function GameWorld({ onEnding }) {
 
     if (atk.type === 'parry') {
       // ── PARRY: 1 arrow ──
+      game.combatStats.parryAttempts++;
       if (result === 'perfect') {
-        // Perfect parry → counter stun + damage to Kairen
+        // Perfect parry -> counter stun + damage to Kairen
         k.state = 'stunned'; k.stunTimer = 2.5;
         k.hp = Math.max(15, k.hp - 15); setBossHp(k.hp);
         game.battle.damageNumbers.push({ dmg: 15, x: k.x, y: k.y, age: 0 });
-        game.combatStats.perfectDodges++;
+        game.combatStats.perfectDodges++; game.combatStats.parrySuccess++; game.combatStats.damageDealt += 15;
       } else if (result === 'good') {
-        // Good parry → brief stun, no damage to either
+        // Good parry -> brief stun, no damage to either
         k.state = 'stunned'; k.stunTimer = 1.0;
-        game.combatStats.goodBlocks++;
+        game.combatStats.goodBlocks++; game.combatStats.parrySuccess++;
       } else {
-        // FAILED PARRY → Kairen gets EMPOWERED (advantage)
+        // FAILED PARRY -> Kairen gets EMPOWERED (advantage)
         k.empowered = true; k.empoweredTimer = 4.0;
-        // Light damage to player from the failed parry attempt
         const dmg = Math.floor(atk.damage * 0.4);
         if (p.hasShield) { p.hasShield = false; }
         else { p.hp = Math.max(0, p.hp - dmg); game.combatStats.damageTaken += dmg; setPlayerHp(p.hp); triggerDmg(); }
@@ -269,36 +269,39 @@ export default function GameWorld({ onEnding }) {
       }
     } else if (atk.type === 'dodge') {
       // ── DODGE: 2-3 arrows ──
+      game.combatStats.dodgeAttempts++;
       if (result === 'perfect') {
-        // Perfect dodge → brief Kairen stun
+        // Perfect dodge -> brief Kairen stun
         k.state = 'stunned'; k.stunTimer = 1.5;
         k.hp = Math.max(15, k.hp - 8); setBossHp(k.hp);
         game.battle.damageNumbers.push({ dmg: 8, x: k.x, y: k.y, age: 0 });
-        game.combatStats.perfectDodges++;
+        game.combatStats.perfectDodges++; game.combatStats.dodgeSuccess++; game.combatStats.damageDealt += 8;
       } else if (result === 'good') {
-        // Good dodge → no damage
-        game.combatStats.goodBlocks++;
+        // Good dodge -> no damage
+        game.combatStats.goodBlocks++; game.combatStats.dodgeSuccess++;
       } else {
-        // FAILED DODGE → take FULL damage
+        // FAILED DODGE -> take FULL damage
         if (p.hasShield) { p.hasShield = false; }
         else { p.hp = Math.max(0, p.hp - atk.damage); game.combatStats.damageTaken += atk.damage; setPlayerHp(p.hp); triggerDmg(); }
       }
     } else if (atk.type === 'barrage') {
       // ── BARRAGE: 8-12 arrows, damage proportional to misses ──
+      game.combatStats.barrageAttempts++;
       const totalArrows = atk.qteLength;
       const missed = missedCount || 0;
+      game.combatStats.barrageArrowsHit += (totalArrows - missed);
       if (missed === 0) {
-        // Perfect barrage survive → massive stun
+        // Perfect barrage survive -> massive stun
         k.state = 'stunned'; k.stunTimer = 3.0;
         k.hp = Math.max(15, k.hp - 20); setBossHp(k.hp);
         game.battle.damageNumbers.push({ dmg: 20, x: k.x, y: k.y, age: 0 });
-        game.combatStats.perfectDodges++;
+        game.combatStats.perfectDodges++; game.combatStats.dodgeSuccess++; game.combatStats.damageDealt += 20;
       } else {
         // Partial: damage = baseDamage * (missed / total)
         const dmg = Math.max(1, Math.floor(atk.damage * (missed / totalArrows)));
         if (p.hasShield && missed <= 2) { p.hasShield = false; }
         else { p.hp = Math.max(0, p.hp - dmg); game.combatStats.damageTaken += dmg; setPlayerHp(p.hp); triggerDmg(); }
-        if (missed <= 2) { game.combatStats.goodBlocks++; }
+        if (missed <= 2) { game.combatStats.goodBlocks++; game.combatStats.dodgeSuccess++; }
       }
     }
 
@@ -497,7 +500,7 @@ export default function GameWorld({ onEnding }) {
         k.hp = Math.max(15, k.hp - dmg); setBossHp(k.hp);
         game.battle.damageNumbers.push({ dmg, x: k.x + (Math.random() - 0.5), y: k.y + (Math.random() - 0.5), age: 0 });
         if (p.isJumping && p.jumpPhase === 'rising') { p.jumpPhase = 'falling'; p.jumpTimer = 0.1; }
-        game.combatStats.hitsLanded++;
+        game.combatStats.hitsLanded++; game.combatStats.damageDealt += dmg;
         if (p.comboCount === 3) game.combatStats.fullCombos++;
         doUnlockCheck(game);
       }
@@ -814,7 +817,13 @@ export default function GameWorld({ onEnding }) {
       if (p.x > BATTLE_ARENA.width - 2 || cs.timer > 3) { cs.phase = 3; cs.timer = 0; setCutsceneText(null); }
     } else if (cs.phase === 3) { cs.fadeAlpha = Math.min(0.3, cs.timer * 0.3); if (cs.timer > 0.8) { cs.phase = 4; cs.timer = 0; cs.fallY = 0; cs.fallScale = 1; }
     } else if (cs.phase === 4) { cs.fallY += dt * 200; cs.fallScale = Math.max(0, 1 - cs.timer * 0.8); cs.fadeAlpha = Math.min(1, cs.timer * 0.6); if (cs.timer > 2.5) { cs.phase = 5; cs.timer = 0; }
-    } else if (cs.phase === 5) { cs.fadeAlpha = 1; if (cs.timer > 1.5) onEnding(); }
+    } else if (cs.phase === 5) { cs.fadeAlpha = 1; if (cs.timer > 1.5) onEnding({
+      ...game.combatStats,
+      unlockedSkills: game.unlockedSkills,
+      bossHpRemaining: game.battle.kairen.hp,
+      finalPlayerHp: game.player.hp,
+      battleTime: Math.floor(game.battle.timer),
+    }); }
   }
   function renderCutscene(ctx, game, W, H) {
     const cs = game.cutscene;

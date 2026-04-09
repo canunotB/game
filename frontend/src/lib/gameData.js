@@ -165,7 +165,10 @@ export const SKILL_UNLOCK_ORDER = ['flame_dash', 'wind_slash', 'earth_shield', '
 
 export const DEFAULT_COMBAT_STATS = {
   dashCount: 0, hitsLanded: 0, fullCombos: 0,
-  perfectDodges: 0, goodBlocks: 0, damageTaken: 0,
+  perfectDodges: 0, goodBlocks: 0, damageTaken: 0, damageDealt: 0,
+  dodgeAttempts: 0, dodgeSuccess: 0,
+  parryAttempts: 0, parrySuccess: 0,
+  barrageAttempts: 0, barrageArrowsHit: 0,
 };
 
 // ─── EQUIPMENT ───────────────────────────────────────────
