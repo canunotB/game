@@ -982,7 +982,7 @@ export default function GameWorld({ onEnding, chapter = 'village' }) {
       <InventoryDisplay items={inventory} />
       <ControlsHelp mode={mode} keybinds={keybinds} />
       <AnimatePresence>{dialogue && <DialogueBox speaker={dialogue.speaker} text={dialogue.text} isTyping={dialogue.typing} choices={dialogueChoices} onChoose={handleDialogueChoice} />}</AnimatePresence>
-      <AnimatePresence>{battleDialogue && !dialogue && <DialogueBox speaker={battleDialogue.speaker} text={battleDialogue.text} isTyping={false} />}</AnimatePresence>
+      <AnimatePresence>{battleDialogue && !dialogue && <DialogueBox speaker={battleDialogue.speaker} text={battleDialogue.text} isTyping={false} autoClose />}</AnimatePresence>
       {qte && <QTEOverlay sequence={qte.sequence} attackType={qte.type} onComplete={handleQTEComplete} />}
       <AnimatePresence>{damageFlash && <DamageFlash />}</AnimatePresence>
       {recoveryState && <RecoveryPrompt direction={recoveryState.direction} />}

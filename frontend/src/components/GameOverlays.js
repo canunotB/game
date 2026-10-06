@@ -28,7 +28,7 @@ export function PlayerHUD({ hp, maxHp, stamina, maxStamina, mana, maxMana, reput
         <div className="hp-bar-container mn-bar"><div className="hp-bar-fill mana-fill" style={{ width: `${mnPct}%` }} data-testid="player-mana-bar" /></div>
       </div>
       <div className="rep-display" data-testid="reputation-display">
-        <span className="rep-label">Reputation:</span> <span className="rep-value">{repTitle}</span>
+        <span className="rep-label">Reputation:</span> <span className="rep-value">{repTitle} ({reputation > 0 ? '+' : ''}{reputation})</span>
       </div>
     </div>
   );
@@ -46,7 +46,7 @@ export function BossBar({ hp, maxHp, name }) {
 }
 
 // ─── Dialogue Box ────────────────────────────────────────
-export function DialogueBox({ speaker, text, isTyping, choices, onChoose }) {
+export function DialogueBox({ speaker, text, isTyping, choices, onChoose, autoClose = false }) {
   return (
     <motion.div className="dialogue-box" initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }} transition={{ duration: 0.2 }} data-testid="dialogue-box">
       <div className="dialogue-speaker" data-testid="dialogue-speaker">{speaker}</div>
@@ -63,7 +63,7 @@ export function DialogueBox({ speaker, text, isTyping, choices, onChoose }) {
           })}
         </div>
       )}
-      {!isTyping && !choices && <div className="dialogue-continue" data-testid="dialogue-continue">Press ENTER to continue</div>}
+      {!isTyping && !choices && !autoClose && <div className="dialogue-continue" data-testid="dialogue-continue">Press ENTER to continue</div>}
     </motion.div>
   );
 }
