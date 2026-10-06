@@ -52,6 +52,10 @@ export function drawIsoTile(ctx, wx, wy, type, camX, camY) {
       topC = GRASS_TOP[v(wx, wy)]; leftC = GRASS_LEFT; rightC = GRASS_RIGHT; break;
     case 1: // path
       topC = PATH_TOP[v(wx, wy) % 3]; leftC = PATH_LEFT; rightC = PATH_RIGHT; break;
+    case 3: // boulder (solid)
+      topC = '#4a4a50'; leftC = '#2a2a30'; rightC = '#36363c'; depth = 30; break;
+    case 10: // stone floor
+      topC = ['#2e3038', '#33353d', '#2a2c34'][v(wx, wy) % 3]; leftC = '#1a1c22'; rightC = '#22242a'; break;
     case 4: // cliff
       topC = CLIFF_TOP; leftC = CLIFF_LEFT; rightC = CLIFF_RIGHT; depth = CLIFF_D; break;
     case 5: // building
@@ -135,6 +139,20 @@ export function drawIsoTile(ctx, wx, wy, type, camX, camY) {
     ctx.fillRect(sx - 3, sy - 14, 6, 12);
     ctx.fillStyle = '#4a4a40';
     ctx.fillRect(sx - 4, sy - 16, 8, 3);
+  } else if (type === 3) {
+    // Boulder highlight
+    ctx.fillStyle = '#5c5c64';
+    ctx.fillRect(sx - 8, sy - 6, 10, 4);
+    ctx.fillStyle = 'rgba(0,0,0,0.25)';
+    ctx.fillRect(sx + 2, sy + 2, 8, 3);
+  } else if (type === 10) {
+    // Stone cracks + pebbles
+    ctx.strokeStyle = 'rgba(0,0,0,0.25)';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(sx - 8, sy + 1); ctx.lineTo(sx + 2, sy - 3);
+    ctx.stroke();
+    if (v(wx, wy) < 2) { ctx.fillStyle = '#44464e'; ctx.fillRect(sx + 6, sy + 2, 3, 2); ctx.fillRect(sx - 10, sy - 2, 2, 2); }
   }
 
   // Building window glow on side faces
@@ -652,6 +670,41 @@ export function drawIsoNPC(ctx, npc, camX, camY, frame) {
     // Feet
     ctx.fillStyle = '#3a3a2a'; ctx.fillRect(sx - 5, sy + bob, 4, 3);
     ctx.fillRect(sx + 1, sy + bob, 4, 3);
+  } else if (npc.sprite === 'hermit') {
+    // Orin — ragged hermit with lantern
+    ctx.fillStyle = '#4a3a2a'; ctx.fillRect(sx - 7, sy - 22 + bob, 14, 22);
+    ctx.fillStyle = '#3a2a1a'; ctx.fillRect(sx - 7, sy - 22 + bob, 3, 22);
+    ctx.fillStyle = '#5a4a3a'; ctx.fillRect(sx + 1, sy - 16 + bob, 4, 10);
+    ctx.fillStyle = '#6a5a3a'; ctx.fillRect(sx - 7, sy - 9 + bob, 14, 2);
+    ctx.fillStyle = '#4a3a2a'; ctx.fillRect(sx - 9, sy - 18 + bob, 3, 8); ctx.fillRect(sx + 6, sy - 18 + bob, 3, 8);
+    ctx.fillStyle = '#c8a888'; ctx.fillRect(sx - 8, sy - 11 + bob, 2, 2); ctx.fillRect(sx + 7, sy - 11 + bob, 2, 2);
+    // Lantern
+    ctx.fillStyle = '#3a3a3a'; ctx.fillRect(sx + 9, sy - 12 + bob, 1, 4);
+    ctx.fillStyle = '#e0b040'; ctx.fillRect(sx + 7, sy - 8 + bob, 5, 6);
+    ctx.fillStyle = 'rgba(224,176,64,0.18)'; ctx.beginPath(); ctx.arc(sx + 9.5, sy - 5 + bob, 14, 0, Math.PI * 2); ctx.fill();
+    // Head + hair + beard
+    ctx.fillStyle = '#d0b090'; ctx.fillRect(sx - 5, sy - 32 + bob, 10, 10);
+    ctx.fillStyle = '#9a9a9a'; ctx.fillRect(sx - 6, sy - 34 + bob, 12, 5); ctx.fillRect(sx - 6, sy - 30 + bob, 2, 8); ctx.fillRect(sx + 4, sy - 30 + bob, 2, 8);
+    ctx.fillStyle = '#b0b0b0'; ctx.fillRect(sx - 4, sy - 23 + bob, 8, 9);
+    ctx.fillStyle = '#2a2a2a'; ctx.fillRect(sx - 3, sy - 28 + bob, 2, 2); ctx.fillRect(sx + 1, sy - 28 + bob, 2, 2);
+  } else if (npc.sprite === 'guard') {
+    // Captain Vael — armored gate guard with spear
+    ctx.fillStyle = '#3a3a48'; ctx.fillRect(sx - 4, sy - 6 + bob, 3, 8); ctx.fillRect(sx + 1, sy - 6 + bob, 3, 8);
+    ctx.fillStyle = '#6a6a7a'; ctx.fillRect(sx - 7, sy - 20 + bob, 14, 15);
+    ctx.fillStyle = '#5a5a6a'; ctx.fillRect(sx - 7, sy - 20 + bob, 3, 15);
+    ctx.fillStyle = '#8a8a9a'; ctx.fillRect(sx - 3, sy - 18 + bob, 6, 8);
+    ctx.fillStyle = '#a03030'; ctx.fillRect(sx - 7, sy - 20 + bob, 14, 3);
+    ctx.fillStyle = '#5a4020'; ctx.fillRect(sx - 7, sy - 7 + bob, 14, 2);
+    ctx.fillStyle = '#6a6a7a'; ctx.fillRect(sx - 9, sy - 18 + bob, 3, 9); ctx.fillRect(sx + 6, sy - 18 + bob, 3, 9);
+    ctx.fillStyle = '#d4b08c'; ctx.fillRect(sx - 8, sy - 10 + bob, 2, 2); ctx.fillRect(sx + 7, sy - 10 + bob, 2, 2);
+    // Spear
+    ctx.fillStyle = '#6a4a2a'; ctx.fillRect(sx + 9, sy - 40 + bob, 2, 44);
+    ctx.fillStyle = '#c0c0c8'; ctx.fillRect(sx + 8, sy - 46 + bob, 4, 7);
+    // Helmet + face
+    ctx.fillStyle = '#d4b08c'; ctx.fillRect(sx - 5, sy - 29 + bob, 10, 9);
+    ctx.fillStyle = '#7a7a8a'; ctx.fillRect(sx - 6, sy - 34 + bob, 12, 6); ctx.fillRect(sx - 6, sy - 28 + bob, 2, 8); ctx.fillRect(sx + 4, sy - 28 + bob, 2, 8);
+    ctx.fillStyle = '#a03030'; ctx.fillRect(sx - 2, sy - 38 + bob, 4, 5);
+    ctx.fillStyle = '#1a1a2a'; ctx.fillRect(sx - 3, sy - 26 + bob, 2, 2); ctx.fillRect(sx + 1, sy - 26 + bob, 2, 2);
   } else {
     // Lyra — huntress with bow
     // Legs
@@ -811,6 +864,16 @@ export function drawInteractIndicator(ctx, wx, wy, camX, camY, text) {
   ctx.fillRect(sx - w / 2 - 6, sy - 58 + bounce, w + 12, 18);
   ctx.fillStyle = '#C5A059';
   ctx.fillText(text, sx, sy - 44 + bounce);
+}
+
+export function drawExitMarker(ctx, wx, wy, camX, camY, text) {
+  const { x: sx, y: sy } = toScreen(wx, wy, camX, camY);
+  const pulse = 0.5 + Math.sin(Date.now() / 400) * 0.25;
+  ctx.fillStyle = `rgba(197,160,89,${pulse * 0.25})`;
+  ctx.beginPath(); ctx.ellipse(sx, sy, 40, 20, 0, 0, Math.PI * 2); ctx.fill();
+  ctx.strokeStyle = `rgba(197,160,89,${pulse})`; ctx.lineWidth = 2;
+  ctx.beginPath(); ctx.ellipse(sx, sy, 34, 17, 0, 0, Math.PI * 2); ctx.stroke();
+  drawInteractIndicator(ctx, wx, wy, camX, camY, `\u2192 ${text}`);
 }
 
 // ═══ KAIREN ATTACK — Massive blue-white crystalline energy ═══

@@ -1,9 +1,9 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import '@/App.css';
 import TitleScreen from './components/TitleScreen';
 import GameWorld from './components/GameWorld';
-import { ENDING_LINES } from './lib/gameData';
+import { CHAPTER2_INTRO, FINAL_LINES } from './lib/gameData';
 
 // ─── DEATH RECAP SCREEN ──────────────────────────────────
 function DeathRecapScreen({ stats, onContinue }) {
@@ -106,58 +106,57 @@ function DeathRecapScreen({ stats, onContinue }) {
   );
 }
 
-// ─── ENDING SCREEN ────────────────────────────────────────
-function EndingScreen({ onRestart }) {
+// ─── STORY INTERLUDE / ENDING SCREEN ──────────────────────
+function StoryScreen({ lines, title, prompt, onDone, testId }) {
   const [lineIndex, setLineIndex] = useState(0);
   const [displayText, setDisplayText] = useState('');
+  const finished = lineIndex >= lines.length;
 
-  useState(() => {
-    let idx = 0;
-    const showNextLine = () => {
-      if (idx >= ENDING_LINES.length) return;
-      const line = ENDING_LINES[idx];
-      let charIdx = 0;
-      setDisplayText('');
-      const typeInterval = setInterval(() => {
-        charIdx++;
-        setDisplayText(line.slice(0, charIdx));
-        if (charIdx >= line.length) {
-          clearInterval(typeInterval);
-          setTimeout(() => {
-            idx++;
-            setLineIndex(idx);
-            showNextLine();
-          }, 1500);
-        }
-      }, 50);
-    };
-    setTimeout(showNextLine, 1000);
-  }, []);
+  useEffect(() => {
+    if (finished) return;
+    const line = lines[lineIndex];
+    let charIdx = 0;
+    setDisplayText('');
+    const typeInterval = setInterval(() => {
+      charIdx++;
+      setDisplayText(line.slice(0, charIdx));
+      if (charIdx >= line.length) {
+        clearInterval(typeInterval);
+        setTimeout(() => setLineIndex(i => i + 1), 1400);
+      }
+    }, 45);
+    return () => clearInterval(typeInterval);
+  }, [lineIndex, lines, finished]);
+
+  useEffect(() => {
+    const skip = (e) => { if (e.key === 'Escape') setLineIndex(lines.length); };
+    window.addEventListener('keydown', skip);
+    return () => window.removeEventListener('keydown', skip);
+  }, [lines.length]);
 
   return (
-    <div className="ending-screen" data-testid="ending-screen">
-      <motion.div
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        transition={{ duration: 2 }}
-      >
-        {lineIndex >= ENDING_LINES.length ? (
+    <div className="ending-screen" data-testid={testId}>
+      <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 2 }}>
+        {finished ? (
           <>
-            <div className="ending-title" data-testid="ending-title">To Be Continued...</div>
+            <div className="ending-title" data-testid={`${testId}-title`}>{title}</div>
             <motion.p
               className="title-prompt"
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
-              transition={{ delay: 1 }}
+              transition={{ delay: 0.8 }}
               style={{ cursor: 'pointer' }}
-              onClick={onRestart}
-              data-testid="restart-button"
+              onClick={onDone}
+              data-testid={`${testId}-continue`}
             >
-              Press to play again
+              {prompt}
             </motion.p>
           </>
         ) : (
-          <p className="ending-text" data-testid="ending-text">{displayText}</p>
+          <>
+            <p className="ending-text" data-testid="ending-text">{displayText}</p>
+            <span className="story-skip">ESC to skip</span>
+          </>
         )}
       </motion.div>
     </div>
@@ -165,7 +164,7 @@ function EndingScreen({ onRestart }) {
 }
 
 function App() {
-  const [screen, setScreen] = useState('title'); // title | game | deathRecap | ending
+  const [screen, setScreen] = useState('title'); // title | game | deathRecap | interlude | chapter2 | ending
   const [combatStats, setCombatStats] = useState(null);
 
   const handleStart = useCallback(() => setScreen('game'), []);
@@ -173,60 +172,26 @@ function App() {
     setCombatStats(stats || {});
     setScreen('deathRecap');
   }, []);
-  const handleRecapContinue = useCallback(() => setScreen('ending'), []);
+  const handleRecapContinue = useCallback(() => setScreen('interlude'), []);
+  const handleInterludeDone = useCallback(() => setScreen('chapter2'), []);
+  const handleChapter2End = useCallback(() => setScreen('ending'), []);
   const handleRestart = useCallback(() => { setCombatStats(null); setScreen('title'); }, []);
+
+  const fade = (key, children, duration = 1) => (
+    <motion.div key={key} initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration }} style={{ width: '100%', height: '100%' }}>
+      {children}
+    </motion.div>
+  );
 
   return (
     <div style={{ width: '100vw', height: '100vh', overflow: 'hidden' }}>
       <AnimatePresence mode="wait">
-        {screen === 'title' && (
-          <motion.div
-            key="title"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            transition={{ duration: 0.5 }}
-          >
-            <TitleScreen onStart={handleStart} />
-          </motion.div>
-        )}
-
-        {screen === 'game' && (
-          <motion.div
-            key="game"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            transition={{ duration: 0.8 }}
-            style={{ width: '100%', height: '100%' }}
-          >
-            <GameWorld onEnding={handleEnding} />
-          </motion.div>
-        )}
-
-        {screen === 'deathRecap' && (
-          <motion.div
-            key="deathRecap"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            transition={{ duration: 1 }}
-          >
-            <DeathRecapScreen stats={combatStats} onContinue={handleRecapContinue} />
-          </motion.div>
-        )}
-
-        {screen === 'ending' && (
-          <motion.div
-            key="ending"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            transition={{ duration: 1.5 }}
-          >
-            <EndingScreen onRestart={handleRestart} />
-          </motion.div>
-        )}
+        {screen === 'title' && fade('title', <TitleScreen onStart={handleStart} />, 0.5)}
+        {screen === 'game' && fade('game', <GameWorld chapter="village" onEnding={handleEnding} />, 0.8)}
+        {screen === 'deathRecap' && fade('deathRecap', <DeathRecapScreen stats={combatStats} onContinue={handleRecapContinue} />)}
+        {screen === 'interlude' && fade('interlude', <StoryScreen lines={CHAPTER2_INTRO} title="Chapter II" prompt="Press to wake up" onDone={handleInterludeDone} testId="interlude-screen" />, 1.5)}
+        {screen === 'chapter2' && fade('chapter2', <GameWorld chapter="ravine" onEnding={handleChapter2End} />, 0.8)}
+        {screen === 'ending' && fade('ending', <StoryScreen lines={FINAL_LINES} title="To Be Continued..." prompt="Press to play again" onDone={handleRestart} testId="ending-screen" />, 1.5)}
       </AnimatePresence>
     </div>
   );

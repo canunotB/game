@@ -19,36 +19,6 @@ db = client[os.environ['DB_NAME']]
 app = FastAPI()
 api_router = APIRouter(prefix="/api")
 
-from npc_ai import NPCBrain
-npc_brain = NPCBrain()
-
-
-class ChatRequest(BaseModel):
-    npc_id: str
-    player_message: str
-    tone: Optional[str] = "neutral"
-    reputation: Optional[int] = 0
-    context: Optional[Dict[str, Any]] = None
-
-class ChatResponse(BaseModel):
-    npc_id: str
-    response: str
-    emotion: str = "neutral"
-    action: Optional[str] = None
-    reputation_change: int = 0
-
-class BattleActionRequest(BaseModel):
-    player_action: str
-    player_position: Dict[str, float]
-    enemy_hp: int
-    player_hp: int
-    environment: Dict[str, Any]
-
-class BattleActionResponse(BaseModel):
-    action: str
-    dialogue: str = ""
-    telegraph: Optional[str] = None
-    qte_sequence: Optional[List[str]] = None
 
 class ReputationUpdate(BaseModel):
     player_id: str
@@ -63,48 +33,6 @@ class GameSaveRequest(BaseModel):
 @api_router.get("/")
 async def root():
     return {"message": "Odyssey's Wrath - Game API"}
-
-@api_router.post("/npc/chat", response_model=ChatResponse)
-async def npc_chat(req: ChatRequest):
-    memory = await db.npc_memory.find_one({"npc_id": req.npc_id}, {"_id": 0})
-    rep = req.reputation or 0
-    response = await npc_brain.chat(
-        npc_id=req.npc_id,
-        player_message=req.player_message,
-        tone=req.tone or "neutral",
-        reputation=rep,
-        context=req.context,
-        memory=memory
-    )
-    await db.npc_memory.update_one(
-        {"npc_id": req.npc_id},
-        {"$push": {"interactions": {
-            "player": req.player_message,
-            "tone": req.tone,
-            "npc": response["response"],
-            "ts": datetime.now(timezone.utc).isoformat()
-        }}},
-        upsert=True
-    )
-    rep_change = {"kind": 1, "aggressive": -1, "cunning": 0, "neutral": 0}.get(req.tone, 0)
-    return ChatResponse(
-        npc_id=req.npc_id,
-        response=response["response"],
-        emotion=response.get("emotion", "neutral"),
-        action=response.get("action"),
-        reputation_change=rep_change
-    )
-
-@api_router.post("/battle/enemy-action", response_model=BattleActionResponse)
-async def enemy_action(req: BattleActionRequest):
-    result = await npc_brain.battle_decision(
-        player_action=req.player_action,
-        player_position=req.player_position,
-        enemy_hp=req.enemy_hp,
-        player_hp=req.player_hp,
-        environment=req.environment
-    )
-    return BattleActionResponse(**result)
 
 @api_router.post("/reputation/update")
 async def update_reputation(req: ReputationUpdate):

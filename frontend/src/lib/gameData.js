@@ -1,4 +1,4 @@
-export const TILES = { GRASS: 0, PATH: 1, TREE: 2, ROCK: 3, CLIFF: 4, BUILDING: 5, WATER: 6, MUD: 7, FLOWERS: 8, RUINS: 9 };
+export const TILES = { GRASS: 0, PATH: 1, TREE: 2, ROCK: 3, CLIFF: 4, BUILDING: 5, WATER: 6, MUD: 7, FLOWERS: 8, RUINS: 9, STONE: 10 };
 export const SOLID_TILES = [TILES.TREE, TILES.ROCK, TILES.CLIFF, TILES.BUILDING, TILES.WATER];
 export const TILE_SIZE = 48;
 export const PLAYER_SPEED = 4.5;
@@ -289,4 +289,159 @@ export const VILLAGE_ENEMIES = [
 export const ARENA_ENEMIES = [
   { id: 'ae1', species: 'stone_warden', x: 4, y: 4, spawnTimer: 15 },
   { id: 'ae2', species: 'ravine_gnasher', x: 20, y: 15, spawnTimer: 25 },
+];
+
+// ─── SCRIPTED DIALOGUE (no AI) ───────────────────────────
+export const NPC_SCRIPTS = {
+  elder_theron: {
+    greeting: {
+      low: "You again. The village whispers about your temper, child. Mind your words here.",
+      mid: "Ah, little one. You should not be out when the sky bleeds like this. Something walks the ravine road tonight.",
+      high: "Child of the bleeding moon... you have been good to us. That is why it pains me to tell you what I have seen.",
+    },
+    responses: {
+      kind: "Troubled? Yes. I dreamt of a blade falling from the heavens. It had your name carved along its edge. Stay close to the fires tonight.",
+      neutral: "The prophecy says a child will shake the throne of the gods. The gods do not forgive such things. They send a man called Kairen to end such children.",
+      aggressive: "Kairen? He waits where the path meets the ravine, east of the village. Go if you must — but do not expect to walk back.",
+      cunning: "What's in it for you? Your life, child. Nothing more. Kairen does not bargain, and neither do the gods.",
+    },
+  },
+  lyra: {
+    greeting: {
+      low: "Oh. It's you. People say you've been rude to the elder. Don't be rude to me.",
+      mid: "Hey! Did you see the stranger by the ravine? Tall, blue armour, eyes like frost. He asked about you.",
+      high: "There you are! I saved you some bread. Listen — there's a knight at the ravine edge. He scares me.",
+    },
+    responses: {
+      kind: "Promise? ...Okay. If you go east, stay on the path. The raptors nest in the tall grass.",
+      neutral: "The knight. He hasn't moved in hours. Just stands at the cliff edge, staring at the village. Staring at YOUR house.",
+      aggressive: "Fine! Go then. But if you get thrown off a cliff don't come crying to me.",
+      cunning: "...Maybe I do. He said the gods paid him in a single word: your name. I don't know what that means.",
+    },
+  },
+  hermit_orin: {
+    greeting: {
+      low: "Hm. The ravine spits out another one. Most of them don't get up. You did. Interesting.",
+      mid: "Easy, easy. You fell a long way, little sparrow. Orin pulled you from the river. You've slept two days.",
+      high: "Awake at last. The river carried you to me — the gods meant you to drown, and the river disagreed.",
+    },
+    responses: {
+      kind: "Kindness, down here? Rare. Keep it. You'll need it where you're going — Cliffgate, up the eastern path. The gate town at the ravine's mouth.",
+      neutral: "Kairen's work. I know the cut of his blade. He threw a prophet down here forty years ago. That prophet was me.",
+      aggressive: "Snarl all you like. Kairen is beyond you — for now. Grow stronger. Climb to Cliffgate. There are others who defied the gods and lived.",
+      cunning: "Clever eyes. Yes, I want something: carry word to Cliffgate that Orin still breathes. Captain Vael will know what it means.",
+    },
+  },
+  captain_vael: {
+    greeting: {
+      low: "Halt. A child crawling out of the ravine with blood on their hands. Give me a reason not to turn you away.",
+      mid: "Halt! ...A child? Out of the ravine? Stand down, lads. Nobody climbs out of there. Who are you?",
+      high: "By the gate! Orin's sparrow — he sent a hawk ahead. Welcome to Cliffgate, little one. You are among friends.",
+    },
+    responses: {
+      kind: "Hm. Soft words from a hard road. Alright. Cliffgate guards the canyon pass — eight towns lie beyond it, and Kairen's shadow over all of them.",
+      neutral: "Kairen was once one of us. A gate-captain, like me. Then the gods called him up the mountain and he came back... different.",
+      aggressive: "Careful. Fire like that is what the gods fear. Keep it banked until you're ready. Then — Timbercross is next. Head through the eastern gate.",
+      cunning: "Angling already? Good. The towns beyond need a blade that thinks. Prove yourself on the road to Timbercross and we'll talk.",
+    },
+  },
+};
+
+export const KAIREN_TAUNTS = [
+  "Is this the child the gods fear?",
+  "Your blade is a toy.",
+  "Stand still. It will be quicker.",
+  "Eight years. That is all you were given.",
+  "The prophecy ends here.",
+  "I take no pleasure in this.",
+];
+
+export const ARENA_INTRO_LINE = 'So... the prophecy child dares to face me.';
+
+// ─── MAP PARSER ──────────────────────────────────────────
+// # cliff  . stone  - path  B building  o boulder  R ruins  ~ water  m mud  g grass  T tree  f flowers
+const CHAR_TILES = { '#': 4, '.': 10, '-': 1, 'B': 5, 'o': 3, 'R': 9, '~': 6, 'm': 7, 'g': 0, 'T': 2, 'f': 8 };
+export function parseMap(rows) { return rows.map(r => [...r].map(c => CHAR_TILES[c] ?? 0)); }
+
+export const RAVINE_MAP = parseMap([
+  '######################',
+  '#..o....R....o.......#',
+  '#.....mm........o....#',
+  '#.....m....~~........#',
+  '#o........~~~.....R..#',
+  '#........~~........--#',
+  '#........~....o...---#',
+  '#.......~~.......----#',
+  '#.......-.........---#',
+  '#..o...~~...mm.....-.#',
+  '#......~....m..o.....#',
+  '#.....~~.............#',
+  '#.R...~..........o...#',
+  '######################',
+]);
+
+export const CLIFFGATE_MAP = parseMap([
+  '##########################',
+  '#..o...............o.....#',
+  '#....BB......BBB......BB.#',
+  '#....BB..---.BBB......BB.#',
+  '#.......--.--.....o......#',
+  '#o.....--...--...........#',
+  '#.....--..R..-------------',
+  '#....--...............---#',
+  '#-----................----',
+  '#....--...o...........--.#',
+  '#.....--........BB.......#',
+  '#.o....---......BB...o...#',
+  '#........---.............#',
+  '#...BB.....---......R....#',
+  '#...BB...................#',
+  '##########################',
+]);
+
+export const MAPS = {
+  village: {
+    id: 'village', name: 'Hollow Village', tiles: VILLAGE_MAP, width: 30, height: 20,
+    spawn: { x: 5, y: 10 }, npcs: VILLAGE_NPCS, enemies: VILLAGE_ENEMIES,
+    exit: { minX: 26, minY: 4, maxX: 30, maxY: 10, type: 'battle', label: 'The Ravine Edge', marker: { x: 27.5, y: 6.5 } },
+  },
+  ravine: {
+    id: 'ravine', name: 'Ravine Floor', tiles: RAVINE_MAP, width: 22, height: 14,
+    spawn: { x: 3, y: 7 },
+    npcs: [{ id: 'hermit_orin', name: 'Orin the Hermit', x: 4, y: 4, sprite: 'hermit' }],
+    enemies: [
+      { id: 're1', species: 'ravine_gnasher', x: 12, y: 7, patrol: true },
+      { id: 're2', species: 'wraithshade', x: 16, y: 3, patrol: true },
+      { id: 're3', species: 'spineback_lurker', x: 14, y: 11, patrol: true },
+    ],
+    exit: { minX: 19, minY: 5, maxX: 22, maxY: 9, type: 'map', next: 'cliffgate', label: 'Climb to Cliffgate', marker: { x: 19.5, y: 6.5 } },
+  },
+  cliffgate: {
+    id: 'cliffgate', name: 'Cliffgate', tiles: CLIFFGATE_MAP, width: 26, height: 16,
+    spawn: { x: 2, y: 8 },
+    npcs: [{ id: 'captain_vael', name: 'Captain Vael', x: 9, y: 7, sprite: 'guard' }],
+    enemies: [
+      { id: 'ce1', species: 'stone_warden', x: 18, y: 4, patrol: false },
+      { id: 'ce2', species: 'cliff_raptor', x: 14, y: 12, patrol: true },
+      { id: 'ce3', species: 'cliff_raptor', x: 21, y: 11, patrol: true },
+    ],
+    exit: { minX: 23, minY: 6, maxX: 26, maxY: 9, type: 'ending', label: 'Eastern Gate - Timbercross', marker: { x: 24, y: 7 } },
+  },
+};
+
+export const CHAPTER2_INTRO = [
+  "You fell...",
+  "into the darkness of the ravine.",
+  "...",
+  "But the prophecy does not end here.",
+  "The gods made a mistake.",
+  "You survived.",
+  "CHAPTER II - THE RAVINE FLOOR",
+];
+
+export const FINAL_LINES = [
+  "Cliffgate stands at the mouth of the canyon.",
+  "Beyond it lie seven more towns, and the road to Timbercross.",
+  "Kairen will hear that the child lived.",
+  "Let him come.",
 ];

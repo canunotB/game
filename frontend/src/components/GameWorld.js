@@ -1,14 +1,13 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { AnimatePresence } from 'framer-motion';
-import axios from 'axios';
 import {
-  VILLAGE_MAP, VILLAGE_NPCS, BATTLE_TRIGGER, BATTLE_ARENA, SOLID_TILES, TILES,
+  MAPS, BATTLE_ARENA, SOLID_TILES, TILES,
   PLAYER_SPEED, KAIREN_SPEED, KAIREN_ATTACKS, KAIREN_PHASES, MAX_STAMINA, MAX_MANA,
   ATTACK_STAMINA, DASH_STAMINA, STAMINA_REGEN, MANA_REGEN,
-  NPC_DIALOGUE_OPTIONS, DIALOGUE_TONES,
+  NPC_DIALOGUE_OPTIONS, DIALOGUE_TONES, NPC_SCRIPTS, KAIREN_TAUNTS, ARENA_INTRO_LINE,
   ALL_SKILLS, ALL_EQUIPMENT, DEFAULT_EQUIPMENT, DEFAULT_KEYBINDS,
   SKILL_UNLOCK_CONDITIONS, SKILL_UNLOCK_ORDER, DEFAULT_COMBAT_STATS,
-  ENEMY_SPECIES, VILLAGE_ENEMIES, ARENA_ENEMIES,
+  ENEMY_SPECIES, ARENA_ENEMIES,
 } from '../lib/gameData';
 import {
   toScreen, drawIsoTile, drawIsoTree, drawIsoPlayer, drawIsoKairen, drawIsoNPC,
@@ -16,17 +15,34 @@ import {
   drawDamageNumber, drawKairenAttack, drawFadeOverlay,
   drawFallingPlayer, drawSkillEffect,
   drawKairenSwingTelegraph, drawKairenSwingArc, drawEmpoweredAura, drawQTETelegraph,
-  drawEnemy, drawEnemyNameTag,
+  drawEnemy, drawEnemyNameTag, drawExitMarker,
 } from '../lib/renderer';
 import {
   PlayerHUD, BossBar, DialogueBox, QTEOverlay,
   InventoryDisplay, ControlsHelp, DamageFlash, SkillBar, GameMenu, RecoveryPrompt,
-  SkillUnlockNotification,
+  SkillUnlockNotification, ZoneBanner,
 } from './GameOverlays';
 
-const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
+const GENERIC_OPTIONS = [
+  { tone: 'kind', text: "Thank you for helping me." },
+  { tone: 'neutral', text: "Where am I? What happened?" },
+  { tone: 'aggressive', text: "Where is Kairen?" },
+  { tone: 'cunning', text: "What do you want from me?" },
+];
 
-export default function GameWorld({ onEnding }) {
+function makeExploreEnemies(list) {
+  return list.map(e => {
+    const spec = ENEMY_SPECIES[e.species];
+    return {
+      ...e, hp: spec.hp, maxHp: spec.hp, name: spec.name,
+      dir: 'down', frame: 0, state: 'patrol',
+      patrolTimer: Math.random() * 3, patrolDir: Math.random() * Math.PI * 2,
+      aggroRange: 4, alive: true, deathTimer: 0, hitFlash: 0, attackCd: 0,
+    };
+  });
+}
+
+export default function GameWorld({ onEnding, chapter = 'village' }) {
   const canvasRef = useRef(null);
   const gameRef = useRef(null);
   const keysRef = useRef({});
@@ -64,6 +80,12 @@ export default function GameWorld({ onEnding }) {
   const [comboDisplay, setComboDisplay] = useState(0);
   const [skillNotification, setSkillNotification] = useState(null);
   const [combatStats, setCombatStats] = useState({ ...DEFAULT_COMBAT_STATS });
+  const [zoneBanner, setZoneBanner] = useState(null);
+
+  const showZone = useCallback((map) => {
+    setZoneBanner({ name: map.name, hint: map.exit.label });
+    setTimeout(() => setZoneBanner(null), 3500);
+  }, []);
 
   useEffect(() => { keybindsRef.current = keybinds; }, [keybinds]);
   useEffect(() => { localStorage.setItem('odyssey_equipment', JSON.stringify(equipment)); }, [equipment]);
@@ -80,10 +102,12 @@ export default function GameWorld({ onEnding }) {
     const canvas = canvasRef.current;
     canvas.width = window.innerWidth;
     canvas.height = window.innerHeight;
+    const map = MAPS[chapter];
     const game = {
       mode: 'explore',
+      map, activeNpcId: null, transitionTimer: 0,
       player: {
-        x: 5, y: 10, dir: 'down', frame: 0, hp: 50, maxHp: 50,
+        x: map.spawn.x, y: map.spawn.y, dir: 'down', frame: 0, hp: 50, maxHp: 50,
         speed: PLAYER_SPEED, inventory: [], isAttacking: false, attackTimer: 0,
         attackAngle: 0, isDashing: false, dashTimer: 0, invincible: 0,
         stamina: MAX_STAMINA, mana: MAX_MANA, dashTrail: [],
@@ -96,7 +120,7 @@ export default function GameWorld({ onEnding }) {
         pushVx: 0, pushVy: 0, pushTimer: 0,
       },
       camera: { x: 0, y: 0 },
-      npcs: VILLAGE_NPCS.map(n => ({ ...n })),
+      npcs: map.npcs.map(n => ({ ...n })),
       battle: {
         kairen: {
           x: BATTLE_ARENA.kairenSpawn.x, y: BATTLE_ARENA.kairenSpawn.y,
@@ -123,26 +147,20 @@ export default function GameWorld({ onEnding }) {
       lastQteSequence: null,
       dialogueActive: false, qteActive: false, frameCount: 0, time: 0, reputation: 0,
       menuOpen: false,
-      // Enemies in the village
-      villageEnemies: VILLAGE_ENEMIES.map(e => {
-        const spec = ENEMY_SPECIES[e.species];
-        return {
-          ...e, hp: spec.hp, maxHp: spec.hp, name: spec.name,
-          dir: 'down', frame: 0, state: 'patrol',
-          patrolTimer: Math.random() * 3, patrolDir: Math.random() * Math.PI * 2,
-          aggroRange: 4, alive: true, deathTimer: 0,
-        };
-      }),
+      // Enemies in the current explore map
+      villageEnemies: makeExploreEnemies(map.enemies),
       arenaEnemies: [],
     };
     gameRef.current = game;
+    window.__odyssey = game;
+    showZone(map);
     for (let i = 0; i < 120; i++) {
       game.rain.particles.push({ x: Math.random() * canvas.width, y: Math.random() * canvas.height, speed: 350 + Math.random() * 250, length: 10 + Math.random() * 14 });
     }
     const handleResize = () => { canvas.width = window.innerWidth; canvas.height = window.innerHeight; };
     window.addEventListener('resize', handleResize);
     return () => { window.removeEventListener('resize', handleResize); cancelAnimationFrame(animFrameRef.current); };
-  }, []);
+  }, [chapter, showZone]);
 
   // ─── KEYBOARD ────────────────────────────────────────────
   useEffect(() => {
@@ -175,33 +193,24 @@ export default function GameWorld({ onEnding }) {
     return () => { canvas.removeEventListener('mousemove', move); canvas.removeEventListener('mousedown', down); };
   }, []);
 
-  // ─── DIALOGUE ────────────────────────────────────────────
-  const handleDialogue = useCallback(async (npcId, npcName) => {
+  // ─── DIALOGUE (scripted) ─────────────────────────────────
+  const handleDialogue = useCallback((npcId, npcName) => {
     const game = gameRef.current; if (game.dialogueActive) return;
-    game.dialogueActive = true;
-    setDialogue({ speaker: npcName, text: '...', typing: true });
-    try {
-      const res = await axios.post(`${API}/npc/chat`, { npc_id: npcId, player_message: 'Hello', tone: 'neutral', reputation: game.reputation });
-      setDialogue({ speaker: npcName, text: res.data.response, typing: false });
-      const options = NPC_DIALOGUE_OPTIONS[npcId]; if (options) setDialogueChoices(options);
-    } catch {
-      const npc = VILLAGE_NPCS.find(n => n.id === npcId);
-      setDialogue({ speaker: npcName, text: npc?.dialogue?.[0] || '...', typing: false });
-      const options = NPC_DIALOGUE_OPTIONS[npcId]; if (options) setDialogueChoices(options);
-    }
+    game.dialogueActive = true; game.activeNpcId = npcId;
+    const script = NPC_SCRIPTS[npcId];
+    const rep = game.reputation;
+    const tier = rep <= -2 ? 'low' : rep >= 2 ? 'high' : 'mid';
+    setDialogue({ speaker: npcName, text: script?.greeting?.[tier] || '...', typing: false });
+    setDialogueChoices(NPC_DIALOGUE_OPTIONS[npcId] || GENERIC_OPTIONS);
   }, []);
-  const handleDialogueChoice = useCallback(async (choice) => {
+  const handleDialogueChoice = useCallback((choice) => {
     const game = gameRef.current;
-    const npcId = dialogue?.speaker === 'Elder Theron' ? 'elder_theron' : 'lyra';
+    const script = NPC_SCRIPTS[game.activeNpcId];
     setDialogueChoices(null);
-    setDialogue(prev => ({ ...prev, text: '...', typing: true }));
     const repChange = DIALOGUE_TONES[choice.tone]?.repChange || 0;
     game.reputation += repChange; setReputation(game.reputation);
-    try {
-      const res = await axios.post(`${API}/npc/chat`, { npc_id: npcId, player_message: choice.text, tone: choice.tone, reputation: game.reputation });
-      setDialogue(prev => ({ ...prev, text: res.data.response, typing: false }));
-    } catch { setDialogue(prev => ({ ...prev, text: 'The words hang in the air...', typing: false })); }
-  }, [dialogue]);
+    setDialogue(prev => ({ ...prev, text: script?.responses?.[choice.tone] || 'The words hang in the air...', typing: false }));
+  }, []);
   useEffect(() => {
     const handleKey = e => {
       if (e.key === 'Enter' && dialogue && !dialogue.typing && !dialogueChoices) {
@@ -332,16 +341,11 @@ export default function GameWorld({ onEnding }) {
     setTimeout(() => setScreenShake(false), 200);
   }, []);
 
-  const requestEnemyAction = useCallback(async (game) => {
-    try {
-      const res = await axios.post(`${API}/battle/enemy-action`, {
-        player_action: game.player.isAttacking ? 'attacking' : 'moving',
-        player_position: { x: game.player.x, y: game.player.y },
-        enemy_hp: game.battle.kairen.hp, player_hp: game.player.hp,
-        environment: { rain: true, hazards: true },
-      });
-      return res.data;
-    } catch { return null; }
+  const kairenTaunt = useCallback(() => {
+    if (Math.random() > 0.35) return;
+    const line = KAIREN_TAUNTS[Math.floor(Math.random() * KAIREN_TAUNTS.length)];
+    setBattleDialogue({ speaker: 'Kairen', text: line });
+    setTimeout(() => setBattleDialogue(null), 2000);
   }, []);
 
   function getEquipStats(equip) {
@@ -364,11 +368,12 @@ export default function GameWorld({ onEnding }) {
 
       if (!game.menuOpen) {
         if (game.cutscene.active) updateCutscene(game, dt);
+        else if (game.transitionTimer > 0) updateTransition(game, dt);
         else if (!game.dialogueActive && !game.qteActive) {
           if (game.recovery.active) updateRecovery(game, dt);
           else {
             updatePlayer(game, dt);
-            if (game.mode === 'explore') updateExplore(game);
+            if (game.mode === 'explore') updateExplore(game, dt);
             else updateBattle(game, dt);
           }
         }
@@ -384,6 +389,7 @@ export default function GameWorld({ onEnding }) {
       drawFog(ctx, W, H, game.time);
       drawVignette(ctx, W, H);
       if (game.cutscene.active) renderCutscene(ctx, game, W, H);
+      if (game.transitionTimer > 0) drawFadeOverlay(ctx, W, H, Math.min(1, Math.sin((1 - game.transitionTimer / 1.6) * Math.PI) * 1.4));
 
       setSkillCooldowns({ ...game.player.skillCooldowns });
       setMana(Math.floor(game.player.mana));
@@ -393,7 +399,24 @@ export default function GameWorld({ onEnding }) {
     };
     animFrameRef.current = requestAnimationFrame(loop);
     return () => cancelAnimationFrame(animFrameRef.current);
-  }, [handleDialogue, handleQTEComplete, requestEnemyAction, onEnding, triggerDmg, doUnlockCheck]);
+  }, [handleDialogue, handleQTEComplete, kairenTaunt, onEnding, triggerDmg, doUnlockCheck, showZone]);
+
+  // ─── MAP TRANSITION ──────────────────────────────────────
+  function loadMap(game, mapId) {
+    const map = MAPS[mapId];
+    game.map = map;
+    game.npcs = map.npcs.map(n => ({ ...n }));
+    game.villageEnemies = makeExploreEnemies(map.enemies);
+    game.player.x = map.spawn.x; game.player.y = map.spawn.y;
+    game.player.hp = game.player.maxHp; setPlayerHp(game.player.maxHp);
+    game.battle.damageNumbers = [];
+    showZone(map);
+  }
+  function updateTransition(game, dt) {
+    game.transitionTimer -= dt;
+    if (game.pendingMap && game.transitionTimer < 0.8) { loadMap(game, game.pendingMap); game.pendingMap = null; }
+    if (game.transitionTimer <= 0) { game.transitionTimer = 0; setCutsceneText(null); }
+  }
 
   // ─── RECOVERY ────────────────────────────────────────────
   function updateRecovery(game, dt) {
@@ -463,7 +486,7 @@ export default function GameWorld({ onEnding }) {
     if (p.invincible > 0) p.invincible -= dt;
 
     // Jump
-    if (keys[kb.jump] && !p.isJumping && game.mode === 'battle') {
+    if (keys[kb.jump] && !p.isJumping) {
       p.isJumping = true; p.jumpPhase = 'rising'; p.jumpTimer = 0; keys[kb.jump] = false;
     }
     if (p.isJumping) {
@@ -475,15 +498,20 @@ export default function GameWorld({ onEnding }) {
 
     const nx = p.x + dx * speed * dt, ny = p.y + dy * speed * dt;
     if (game.mode === 'explore') {
-      const tx = Math.floor(nx), ty = Math.floor(ny);
-      if (tx >= 0 && tx < 30 && ty >= 0 && ty < 20 && !SOLID_TILES.includes(VILLAGE_MAP[ty]?.[tx])) { p.x = nx; p.y = ny; }
+      const walkable = (wx, wy) => {
+        const tx = Math.floor(wx), ty = Math.floor(wy), m = game.map;
+        return tx >= 0 && tx < m.width && ty >= 0 && ty < m.height && !SOLID_TILES.includes(m.tiles[ty]?.[tx]);
+      };
+      // Per-axis collision so the player slides along walls instead of sticking
+      if (walkable(nx, p.y)) p.x = nx;
+      if (walkable(p.x, ny)) p.y = ny;
     } else {
       if (nx > 0.5 && nx < BATTLE_ARENA.width - 0.5) p.x = nx;
       if (ny > 0.5 && ny < BATTLE_ARENA.height - 0.5) p.y = ny;
     }
 
-    // Combo attacks
-    if (mouse.clicked && !p.isAttacking && p.stamina >= ATTACK_STAMINA * stats.weaponSpeed && game.mode === 'battle') {
+    // Combo attacks (work in both explore and battle)
+    if (mouse.clicked && !p.isAttacking && p.stamina >= ATTACK_STAMINA * stats.weaponSpeed) {
       const timeSinceLast = game.time - p.lastAttackTime;
       p.comboCount = (timeSinceLast < 0.45 && p.comboCount < 3) ? p.comboCount + 1 : 1;
       p.lastAttackTime = game.time;
@@ -492,17 +520,24 @@ export default function GameWorld({ onEnding }) {
       p.stamina -= ATTACK_STAMINA * stats.weaponSpeed * (1 - (p.comboCount - 1) * 0.08);
       const ps = toScreen(p.x, p.y, game.camera.x, game.camera.y);
       p.attackAngle = Math.atan2(mouse.y - ps.y + 10, mouse.x - ps.x);
-      const k = game.battle.kairen, dist = Math.hypot(p.x - k.x, p.y - k.y);
-      if (dist < (p.isJumping ? 3.0 : 2.5)) {
-        let dmg = k.state === 'stunned' ? Math.floor(stats.weaponDmg * 1.5) : Math.max(2, Math.floor(stats.weaponDmg * 0.5));
-        dmg = Math.floor(dmg * (1 + (p.comboCount - 1) * 0.2));
-        if (p.isJumping) dmg = Math.floor(dmg * 1.3);
-        k.hp = Math.max(15, k.hp - dmg); setBossHp(k.hp);
-        game.battle.damageNumbers.push({ dmg, x: k.x + (Math.random() - 0.5), y: k.y + (Math.random() - 0.5), age: 0 });
-        if (p.isJumping && p.jumpPhase === 'rising') { p.jumpPhase = 'falling'; p.jumpTimer = 0.1; }
-        game.combatStats.hitsLanded++; game.combatStats.damageDealt += dmg;
-        if (p.comboCount === 3) game.combatStats.fullCombos++;
-        doUnlockCheck(game);
+      let comboDmg = Math.floor(stats.weaponDmg * (1 + (p.comboCount - 1) * 0.2));
+      if (p.isJumping) comboDmg = Math.floor(comboDmg * 1.3);
+      if (game.mode === 'battle') {
+        const k = game.battle.kairen, dist = Math.hypot(p.x - k.x, p.y - k.y);
+        if (dist < (p.isJumping ? 3.0 : 2.5)) {
+          let dmg = k.state === 'stunned' ? Math.floor(stats.weaponDmg * 1.5) : Math.max(2, Math.floor(stats.weaponDmg * 0.5));
+          dmg = Math.floor(dmg * (1 + (p.comboCount - 1) * 0.2));
+          if (p.isJumping) dmg = Math.floor(dmg * 1.3);
+          k.hp = Math.max(15, k.hp - dmg); setBossHp(k.hp);
+          game.battle.damageNumbers.push({ dmg, x: k.x + (Math.random() - 0.5), y: k.y + (Math.random() - 0.5), age: 0 });
+          if (p.isJumping && p.jumpPhase === 'rising') { p.jumpPhase = 'falling'; p.jumpTimer = 0.1; }
+          game.combatStats.hitsLanded++; game.combatStats.damageDealt += dmg;
+          if (p.comboCount === 3) game.combatStats.fullCombos++;
+          doUnlockCheck(game);
+        }
+        hitEnemies(game, game.arenaEnemies, comboDmg);
+      } else {
+        hitEnemies(game, game.villageEnemies, comboDmg);
       }
     }
     if (p.isAttacking) { p.attackTimer -= dt; if (p.attackTimer <= 0) p.isAttacking = false; }
@@ -546,28 +581,65 @@ export default function GameWorld({ onEnding }) {
     }
   }
 
-  function updateExplore(game) {
-    const p = game.player, keys = keysRef.current, kb = keybindsRef.current;
+  function hitEnemies(game, list, dmg) {
+    const p = game.player;
+    for (const e of list) {
+      if (!e.alive) continue;
+      if (Math.hypot(p.x - e.x, p.y - e.y) > 2.4) continue;
+      e.hp -= dmg; e.hitFlash = 0.15;
+      game.battle.damageNumbers.push({ dmg, x: e.x + (Math.random() - 0.5) * 0.5, y: e.y, age: 0 });
+      // Knock the enemy back slightly
+      const a = Math.atan2(e.y - p.y, e.x - p.x);
+      e.x += Math.cos(a) * 0.6; e.y += Math.sin(a) * 0.6;
+      if (e.hp <= 0) { e.alive = false; e.deathTimer = 1; }
+    }
+  }
+
+  function updateExplore(game, dt) {
+    const p = game.player, keys = keysRef.current, kb = keybindsRef.current, exit = game.map.exit;
     let nearNPC = null;
     for (const npc of game.npcs) { if (Math.hypot(p.x - npc.x, p.y - npc.y) < 2) { nearNPC = npc; break; } }
     if (nearNPC && keys[kb.interact]) { keys[kb.interact] = false; handleDialogue(nearNPC.id, nearNPC.name); }
-    if (p.x >= BATTLE_TRIGGER.minX && p.x <= BATTLE_TRIGGER.maxX && p.y >= BATTLE_TRIGGER.minY && p.y <= BATTLE_TRIGGER.maxY) {
-      game.mode = 'battle'; p.x = BATTLE_ARENA.playerSpawn.x; p.y = BATTLE_ARENA.playerSpawn.y;
-      p.hp = p.maxHp; p.stamina = MAX_STAMINA; p.mana = MAX_MANA;
-      game.combatStats = { ...DEFAULT_COMBAT_STATS }; game.unlockedSkills = [];
-      setUnlockedSkills([]); setEquippedSkills([]); setCombatStats({ ...DEFAULT_COMBAT_STATS });
-      const k = game.battle.kairen; k.hp = 100; k.phaseUnlocked = 1; k.lowestHp = 100; k.empowered = false;
-      // Spawn arena enemies
-      game.arenaEnemies = ARENA_ENEMIES.map(e => {
-        const spec = ENEMY_SPECIES[e.species];
-        return { ...e, hp: spec.hp, maxHp: spec.hp, name: spec.name, dir: 'down', frame: 0, state: 'idle', alive: false, spawnCountdown: e.spawnTimer, deathTimer: 0 };
-      });
-      setMode('battle'); setPlayerHp(p.maxHp); setBossHp(100);
-      setBattleDialogue({ speaker: 'Kairen', text: 'So... the prophecy child dares to face me.' });
-      setTimeout(() => setBattleDialogue(null), 3500);
+    game.battle.damageNumbers = game.battle.damageNumbers.filter(d => { d.age += dt; return d.age < 1; });
+
+    // Collapsed in explore -> wake up at the map's spawn point
+    if (p.hp <= 0) {
+      p.x = game.map.spawn.x; p.y = game.map.spawn.y;
+      p.hp = p.maxHp; setPlayerHp(p.maxHp); p.invincible = 1.5;
+      for (const e of game.villageEnemies) { if (e.alive) e.state = 'patrol'; }
+      setCutsceneText('You collapsed... and woke where you started.');
+      setTimeout(() => setCutsceneText(null), 2500);
     }
-    // Update village enemies (patrol / aggro)
-    updateVillageEnemies(game);
+
+    if (p.x >= exit.minX && p.x <= exit.maxX && p.y >= exit.minY && p.y <= exit.maxY) {
+      if (exit.type === 'battle') startBattle(game);
+      else if (exit.type === 'map') {
+        game.transitionTimer = 1.6; game.pendingMap = exit.next;
+        setCutsceneText(exit.label);
+      } else if (exit.type === 'ending') {
+        game.transitionTimer = 99;
+        onEnding(null);
+      }
+    }
+    updateVillageEnemies(game, dt);
+  }
+
+  function startBattle(game) {
+    const p = game.player;
+    game.mode = 'battle'; p.x = BATTLE_ARENA.playerSpawn.x; p.y = BATTLE_ARENA.playerSpawn.y;
+    p.hp = p.maxHp; p.stamina = MAX_STAMINA; p.mana = MAX_MANA;
+    game.combatStats = { ...DEFAULT_COMBAT_STATS }; game.unlockedSkills = [];
+    setUnlockedSkills([]); setEquippedSkills([]); setCombatStats({ ...DEFAULT_COMBAT_STATS });
+    const k = game.battle.kairen; k.hp = 100; k.phaseUnlocked = 1; k.lowestHp = 100; k.empowered = false;
+    game.battle.damageNumbers = [];
+    // Spawn arena enemies
+    game.arenaEnemies = ARENA_ENEMIES.map(e => {
+      const spec = ENEMY_SPECIES[e.species];
+      return { ...e, hp: spec.hp, maxHp: spec.hp, name: spec.name, dir: 'down', frame: 0, state: 'idle', alive: false, spawnCountdown: e.spawnTimer, deathTimer: 0, hitFlash: 0, attackCd: 0 };
+    });
+    setMode('battle'); setPlayerHp(p.maxHp); setBossHp(100);
+    setBattleDialogue({ speaker: 'Kairen', text: ARENA_INTRO_LINE });
+    setTimeout(() => setBattleDialogue(null), 3500);
   }
 
   // ─── BATTLE UPDATE (with real-time swings + phases) ──────
@@ -693,10 +765,7 @@ export default function GameWorld({ onEnding }) {
             const chosen = available[Math.floor(Math.random() * available.length)];
             k.currentAttack = chosen; k.state = 'telegraph';
             k.telegraphTimer = KAIREN_ATTACKS[chosen].telegraph; k.qteSequence = null;
-            requestEnemyAction(game).then(r => {
-              if (r?.dialogue) { setBattleDialogue({ speaker: 'Kairen', text: r.dialogue }); setTimeout(() => setBattleDialogue(null), 2000); }
-              if (r?.qte_sequence?.length) k.qteSequence = r.qte_sequence;
-            });
+            kairenTaunt();
           }
           k.aiCooldown = k.empowered ? 0.6 + Math.random() * 0.5 : 1.0 + Math.random() * 0.8;
         }
@@ -716,44 +785,49 @@ export default function GameWorld({ onEnding }) {
     updateArenaEnemies(game, dt);
   }
 
-  // ─── VILLAGE ENEMIES ──────────────────────────────────────
-  function updateVillageEnemies(game) {
-    const p = game.player;
+  // ─── EXPLORE ENEMIES ──────────────────────────────────────
+  function updateVillageEnemies(game, dt) {
+    const p = game.player, m = game.map;
     for (const e of game.villageEnemies) {
       if (!e.alive) continue;
+      if (e.hitFlash > 0) e.hitFlash -= dt;
       const spec = ENEMY_SPECIES[e.species];
       const dist = Math.hypot(p.x - e.x, p.y - e.y);
 
       if (dist < e.aggroRange) {
         // Chase player
         const a = Math.atan2(p.y - e.y, p.x - e.x);
-        const sp = spec.speed * 0.4; // Slower in village
-        e.x += Math.cos(a) * sp * 0.016;
-        e.y += Math.sin(a) * sp * 0.016;
-        // Contact damage
-        if (dist < 1.2 && p.invincible <= 0 && !p.hasShield) {
-          p.hp = Math.max(0, p.hp - spec.damage * 0.016);
-          setPlayerHp(Math.ceil(p.hp));
+        const sp = spec.speed * 0.4; // Slower in explore
+        if (dist > 0.9) { e.x += Math.cos(a) * sp * dt; e.y += Math.sin(a) * sp * dt; }
+        e.state = 'chase';
+        // Contact damage (discrete hits with cooldown)
+        if (e.attackCd > 0) e.attackCd -= dt;
+        if (dist < 1.2 && p.invincible <= 0 && !p.hasShield && e.attackCd <= 0) {
+          p.hp = Math.max(0, p.hp - Math.ceil(spec.damage * 0.5));
+          p.invincible = 0.5; e.attackCd = 1.1;
+          setPlayerHp(Math.ceil(p.hp)); triggerDmg();
         }
       } else {
         // Patrol
-        e.patrolTimer -= 0.016;
+        e.state = 'patrol';
+        e.patrolTimer -= dt;
         if (e.patrolTimer <= 0) {
           e.patrolDir = Math.random() * Math.PI * 2;
           e.patrolTimer = 2 + Math.random() * 3;
         }
         if (e.patrol) {
-          const nx = e.x + Math.cos(e.patrolDir) * spec.speed * 0.2 * 0.016;
-          const ny = e.y + Math.sin(e.patrolDir) * spec.speed * 0.2 * 0.016;
+          const nx = e.x + Math.cos(e.patrolDir) * spec.speed * 0.2 * dt;
+          const ny = e.y + Math.sin(e.patrolDir) * spec.speed * 0.2 * dt;
           const tx = Math.floor(nx), ty = Math.floor(ny);
-          if (tx >= 1 && tx < 29 && ty >= 1 && ty < 19 && !SOLID_TILES.includes(VILLAGE_MAP[ty]?.[tx])) {
+          if (tx >= 1 && tx < m.width - 1 && ty >= 1 && ty < m.height - 1 && !SOLID_TILES.includes(m.tiles[ty]?.[tx])) {
             e.x = nx; e.y = ny;
           } else { e.patrolDir += Math.PI; }
         }
       }
       // Clamp to map
-      e.x = Math.max(1, Math.min(28, e.x));
-      e.y = Math.max(1, Math.min(18, e.y));
+      e.x = Math.max(1, Math.min(m.width - 2, e.x));
+      e.y = Math.max(1, Math.min(m.height - 2, e.y));
+      if (game.frameCount % 8 === 0) e.frame = (e.frame + 1) % 4;
     }
   }
 
@@ -772,6 +846,7 @@ export default function GameWorld({ onEnding }) {
         }
         continue;
       }
+      if (e.hitFlash > 0) e.hitFlash -= dt;
       const spec = ENEMY_SPECIES[e.species];
       const dist = Math.hypot(p.x - e.x, p.y - e.y);
       // Chase
@@ -780,23 +855,17 @@ export default function GameWorld({ onEnding }) {
         e.x += Math.cos(a) * spec.speed * 0.5 * dt;
         e.y += Math.sin(a) * spec.speed * 0.5 * dt;
       }
-      // Contact damage
-      if (dist < 1.5 && p.invincible <= 0 && !p.hasShield) {
-        p.hp = Math.max(0, p.hp - spec.damage * dt * 0.5);
-        setPlayerHp(Math.ceil(p.hp));
-      }
-      // Player can damage enemies with attacks
-      if (p.isAttacking && dist < 2.5) {
-        const stats = getEquipStats(p.equipment);
-        e.hp -= stats.weaponDmg * dt * 3;
-        game.battle.damageNumbers.push({ dmg: Math.floor(stats.weaponDmg * 0.5), x: e.x, y: e.y, age: 0 });
-        if (e.hp <= 0) {
-          e.alive = false;
-          e.deathTimer = 1;
-        }
+      // Contact damage (discrete hits with cooldown)
+      if (e.attackCd > 0) e.attackCd -= dt;
+      if (dist < 1.5 && p.invincible <= 0 && !p.hasShield && e.attackCd <= 0) {
+        const dmg = Math.ceil(spec.damage * 0.5);
+        p.hp = Math.max(0, p.hp - dmg); p.invincible = 0.5; e.attackCd = 1.3;
+        game.combatStats.damageTaken += dmg;
+        setPlayerHp(Math.ceil(p.hp)); triggerDmg();
       }
       e.x = Math.max(1, Math.min(BATTLE_ARENA.width - 1, e.x));
       e.y = Math.max(1, Math.min(BATTLE_ARENA.height - 1, e.y));
+      if (game.frameCount % 8 === 0) e.frame = (e.frame + 1) % 4;
     }
   }
 
@@ -841,20 +910,22 @@ export default function GameWorld({ onEnding }) {
 
   // ─── RENDER ─────────────────────────────────────────────
   function renderExplore(ctx, game) {
-    const cx = game.camera.x, cy = game.camera.y;
-    for (let d = 0; d <= 48; d++) for (let x = Math.max(0, d - 19); x <= Math.min(d, 29); x++) { const y = d - x; if (y >= 0 && y < 20) { const t = VILLAGE_MAP[y]?.[x] ?? 0; drawIsoTile(ctx, x, y, t === TILES.TREE ? TILES.GRASS : t, cx, cy); } }
+    const cx = game.camera.x, cy = game.camera.y, m = game.map, tiles = m.tiles, mw = m.width, mh = m.height;
+    for (let d = 0; d <= mw + mh - 2; d++) for (let x = Math.max(0, d - mh + 1); x <= Math.min(d, mw - 1); x++) { const y = d - x; if (y >= 0 && y < mh) { const t = tiles[y]?.[x] ?? 0; drawIsoTile(ctx, x, y, t === TILES.TREE ? TILES.GRASS : t, cx, cy); } }
+    drawExitMarker(ctx, m.exit.marker.x, m.exit.marker.y, cx, cy, m.exit.label);
     const ents = [];
-    for (let y = 0; y < 20; y++) for (let x = 0; x < 30; x++) if (VILLAGE_MAP[y]?.[x] === TILES.TREE) ents.push({ t: 'tree', x, y, d: x + y + 0.5 });
+    for (let y = 0; y < mh; y++) for (let x = 0; x < mw; x++) if (tiles[y]?.[x] === TILES.TREE) ents.push({ t: 'tree', x, y, d: x + y + 0.5 });
     ents.push({ t: 'player', d: game.player.x + game.player.y });
     for (const npc of game.npcs) ents.push({ t: 'npc', data: npc, d: npc.x + npc.y });
     for (const e of game.villageEnemies) { if (e.alive) ents.push({ t: 'enemy', data: e, d: e.x + e.y }); }
     ents.sort((a, b) => a.d - b.d);
     for (const e of ents) {
       if (e.t === 'tree') drawIsoTree(ctx, e.x, e.y, cx, cy);
-      else if (e.t === 'player') { const p = game.player; drawIsoPlayer(ctx, p.x, p.y, p.dir, p.frame, cx, cy, p.isAttacking, p.attackAngle, p.isDashing, p.dashTrail, 0, p.comboCount, false); }
+      else if (e.t === 'player') { const p = game.player; drawIsoPlayer(ctx, p.x, p.y, p.dir, p.frame, cx, cy, p.isAttacking, p.attackAngle, p.isDashing, p.dashTrail, p.jumpHeight, p.comboCount, false); }
       else if (e.t === 'npc') drawIsoNPC(ctx, e.data, cx, cy, game.frameCount);
       else if (e.t === 'enemy') { drawEnemy(ctx, e.data, cx, cy, game.frameCount); drawEnemyNameTag(ctx, e.data, cx, cy); }
     }
+    for (const d of game.battle.damageNumbers) drawDamageNumber(ctx, d.dmg, d.x, d.y, d.age, cx, cy);
   }
 
   function renderBattle(ctx, game) {
@@ -916,6 +987,7 @@ export default function GameWorld({ onEnding }) {
       <AnimatePresence>{damageFlash && <DamageFlash />}</AnimatePresence>
       {recoveryState && <RecoveryPrompt direction={recoveryState.direction} />}
       <AnimatePresence>{skillNotification && <SkillUnlockNotification skill={skillNotification.skill} />}</AnimatePresence>
+      <AnimatePresence>{zoneBanner && <ZoneBanner name={zoneBanner.name} hint={zoneBanner.hint} />}</AnimatePresence>
       {cutsceneText && <div className="cutscene-text" data-testid="cutscene-text">{cutsceneText}</div>}
       {menuOpen && <GameMenu equippedSkills={equippedSkills} setEquippedSkills={setEquippedSkills} unlockedSkills={unlockedSkills} combatStats={combatStats} equipment={equipment} setEquipment={setEquipment} keybinds={keybinds} setKeybinds={setKeybinds} onClose={() => { setMenuOpen(false); if (gameRef.current) gameRef.current.menuOpen = false; }} />}
     </div>

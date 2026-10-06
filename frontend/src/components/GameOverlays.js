@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   QTE_ARROWS, QTE_KEYS, DIALOGUE_TONES, getReputationTitle,
@@ -74,9 +74,10 @@ export function QTEOverlay({ sequence, attackType, onComplete }) {
   const [results, setResults] = useState([]);
   const [timeLeft, setTimeLeft] = useState(100);
   const [showResult, setShowResult] = useState(null);
-  const doneRef = { current: false };
-  const startRef = { current: Date.now() };
-  const keyRef = { current: Date.now() };
+  const doneRef = useRef(false);
+  const startRef = useRef(Date.now());
+  const keyRef = useRef(Date.now());
+  const resultsRef = useRef([]);
   const isBarrage = attackType === 'barrage';
 
   useEffect(() => {
@@ -90,12 +91,13 @@ export function QTEOverlay({ sequence, attackType, onComplete }) {
       if (pct <= 0 && !doneRef.current) {
         doneRef.current = true; clearInterval(timer);
         // On timeout: count remaining arrows as missed
-        const missed = sequence.length - results.length;
-        onComplete('miss', missed);
+        const missed = sequence.length - resultsRef.current.filter(r => r !== 'miss').length;
+        setShowResult('miss');
+        setTimeout(() => onComplete('miss', missed), 400);
       }
     }, 50);
     return () => clearInterval(timer);
-  }, [sequence, attackType, onComplete, results.length]);
+  }, [sequence, attackType, onComplete]);
 
   const handleKey = useCallback((e) => {
     if (doneRef.current) return;
@@ -105,9 +107,9 @@ export function QTEOverlay({ sequence, attackType, onComplete }) {
     const dt = Date.now() - keyRef.current;
 
     if (pressed === expected) {
-      const grade = dt < 180 ? 'perfect' : dt < 400 ? 'good' : 'late';
+      const grade = dt < 350 ? 'perfect' : dt < 700 ? 'good' : 'late';
       const nr = [...results, grade];
-      setResults(nr);
+      setResults(nr); resultsRef.current = nr;
       keyRef.current = Date.now();
       if (currentIdx + 1 >= sequence.length) {
         doneRef.current = true;
@@ -122,7 +124,7 @@ export function QTEOverlay({ sequence, attackType, onComplete }) {
       if (isBarrage) {
         // Barrage: wrong key counts as miss but CONTINUES
         const nr = [...results, 'miss'];
-        setResults(nr);
+        setResults(nr); resultsRef.current = nr;
         keyRef.current = Date.now();
         if (currentIdx + 1 >= sequence.length) {
           doneRef.current = true;
@@ -134,7 +136,8 @@ export function QTEOverlay({ sequence, attackType, onComplete }) {
       } else {
         // Parry / Dodge: wrong key = immediate fail
         doneRef.current = true;
-        setResults([...results, 'miss']);
+        const nr = [...results, 'miss'];
+        setResults(nr); resultsRef.current = nr;
         setShowResult('miss');
         setTimeout(() => onComplete('miss', 1), 400);
       }
@@ -242,6 +245,16 @@ export function SkillUnlockNotification({ skill }) {
       <div className="unlock-icon" style={{ color: skill.color }}>{skill.icon}</div>
       <div className="unlock-name">{skill.name}</div>
       <div className="unlock-desc">{skill.desc}</div>
+    </motion.div>
+  );
+}
+
+// ─── Zone Banner (on map load) ───────────────────────────
+export function ZoneBanner({ name, hint }) {
+  return (
+    <motion.div className="zone-banner" initial={{ opacity: 0, y: -16 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} transition={{ duration: 0.6 }} data-testid="zone-banner">
+      <div className="zone-name" data-testid="zone-name">{name}</div>
+      <div className="zone-hint" data-testid="zone-hint">Find the exit: {hint}</div>
     </motion.div>
   );
 }
@@ -435,12 +448,12 @@ export function ControlsHelp({ mode, keybinds }) {
     <div className="controls-help" data-testid="controls-help">
       <div className="control-hint"><span className="key-bind">{kd(keybinds.moveUp)}{kd(keybinds.moveLeft)}{kd(keybinds.moveDown)}{kd(keybinds.moveRight)}</span> move</div>
       <div className="control-hint"><span className="key-bind">{kd(keybinds.menu)}</span> menu</div>
-      {mode === 'explore' && <div className="control-hint"><span className="key-bind">{kd(keybinds.interact)}</span> interact</div>}
+      <div className="control-hint"><span className="key-bind">M1</span> attack</div>
+      <div className="control-hint"><span className="key-bind">{kd(keybinds.dash)}</span> dash</div>
+      <div className="control-hint"><span className="key-bind">{kd(keybinds.jump)}</span> jump</div>
+      {mode === 'explore' && <div className="control-hint"><span className="key-bind">{kd(keybinds.interact)}</span> talk</div>}
       {mode === 'battle' && (
         <>
-          <div className="control-hint"><span className="key-bind">M1</span> attack</div>
-          <div className="control-hint"><span className="key-bind">{kd(keybinds.dash)}</span> dash</div>
-          <div className="control-hint"><span className="key-bind">{kd(keybinds.jump)}</span> jump</div>
           <div className="control-hint"><span className="key-bind">{kd(keybinds.interact)}</span> pick up</div>
           <div className="control-hint"><span className="key-bind">{kd(keybinds.throw)}</span> throw</div>
           <div className="control-hint"><span className="key-bind">1-5</span> skills</div>

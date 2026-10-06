@@ -13,11 +13,11 @@ export default function TitleScreen({ onStart }) {
       if (phase === 'title' && (e.key === 'Enter' || e.key === ' ')) {
         setPhase('story');
       } else if (phase === 'story') {
-        if (typing) {
+        if (e.key === 'Escape') {
+          onStart();
+        } else if (typing) {
           setDisplayText(STORY_LINES[storyIndex]);
           setTyping(false);
-        } else if (e.key === 'Escape') {
-          onStart();
         } else {
           if (storyIndex < STORY_LINES.length - 1) {
             setStoryIndex((i) => i + 1);
